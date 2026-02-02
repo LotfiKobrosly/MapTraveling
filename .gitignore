@@ -1,4 +1,4 @@
-./map
-./__pycache__
+./map*
+./__pycache__*
 ./.git
-./.ipynb_checkpoints
+./.ipynb_checkpoints*
