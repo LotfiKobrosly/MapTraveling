@@ -1,4 +1,5 @@
-./map*
-./__pycache__*
-./.git
-./.ipynb_checkpoints*
+map*
+__pycache__*
+.git
+.ipynb_checkpoints*
+scratch_*
