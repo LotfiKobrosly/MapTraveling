@@ -3,3 +3,4 @@ __pycache__*
 .git
 .ipynb_checkpoints*
 scratch_*
+*.jpeg

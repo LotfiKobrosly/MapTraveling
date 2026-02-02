@@ -1,11 +1,12 @@
 import random
 from copy import deepcopy
 import numpy as np
-from sklearn.mixtures import GaussianMixture
+from sklearn.mixture import GaussianMixture
 from utils import *
 
 RANDOM_STATE = np.random.RandomState(seed=42)
 SAMPLE_SIZE = 1000
+
 
 class PathGenerator(object):
 
@@ -28,6 +29,7 @@ class PathGenerator(object):
                 ]
                 for i in range(height)
             ]
+            self.nrpa_iterations = 0
 
     def is_finished(self):
         return (
@@ -51,46 +53,64 @@ class PathGenerator(object):
 
         elif self.strategy == "nrpa":
             position = self.current_position
-            policy = self.policy[position[0], position[1]]
-            mixture_data = np.concatenate(
-                [
-                    RANDOM_STATE.normal(key, value, SAMPLE_SIZE)
-                    for (key, value) in policy.items()
-                ]
-            )
-            normalized_angle = GaussianMixture(1).fit(mixture_data).sample(1)
+            policy = self.policy[position[0]][position[1]]
+            if policy:
+                mixture_data = np.concatenate(
+                    [
+                        RANDOM_STATE.normal(key, value, SAMPLE_SIZE)
+                        for (key, value) in policy.items()
+                    ]
+                ).reshape(-1, 1)
+                normalized_angle = GaussianMixture(1).fit(mixture_data).sample(1)[0][0]
+            else:
+                normalized_angle = random.random()
 
         else:
             raise(ValueError("No strategy defined"))
 
         return normalized_angle, cell_selector(self.current_position, normalized_angle * 2 * np.pi)
 
-    def adapt_policy(self, best_trajectory, policy=None):
+    def adapt_policy(self, best_trajectory, best_course_of_actions, policy=None):
         if policy is None:
             policy = self.policy
-        pass
+        for (point_index, point) in enumerate(best_trajectory[:-1]):
+            i, j = point[0], point[1]
+            current_policy = policy[i][j]
+            if current_policy:
+                average_std = np.mean(np.array(list(current_policy.values())))
+                for (key, value) in current_policy.items():
+                    current_policy[key] = value * 10 / 9
+                current_policy[self.code_action(best_course_of_actions[point_index])] = average_std * 9 / 10
+            else:
+                current_policy[self.code_action(best_course_of_actions[point_index])] = 0.5
 
     def nrpa(self, level: int=1, n_policies: int=100):
 
         if level == 0:
             self.generate_path()
-            return self.trajectory, self.get_score()
+            self.nrpa_iterations += 1
+            
 
         else:
+            iteration_number = self.nrpa_iterations
             best_score = self.best_score
-            best_trajectory = self.trajectory
+            best_trajectory = deepcopy(self.trajectory)
+            best_course_of_actions = deepcopy(self.actions)
             policy = deepcopy(self.policy)
             for _ in range(n_policies):
-                frames, score = self.nrpa_iteration(level - 1, n_policies)
+                self.reinitialize()
+                self.nrpa(level - 1, n_policies)
+                score = self.get_score()
                 if score < best_score:
                     best_score = score
-                    best_trajectory = self.trajectory
-                self.adapt_policy(best_trajectory)
-            self.adapt_policy(best_trajectory, policy)
+                    best_trajectory = deepcopy(self.trajectory)
+                    best_course_of_actions = deepcopy(self.actions)
+                self.adapt_policy(best_trajectory, best_course_of_actions)
+            self.nrpa_iterations = iteration_number + 1
+            self.adapt_policy(best_trajectory, best_course_of_actions, policy=policy)
             self.policy = policy
             self.trajectory = best_trajectory
             self.best_score = best_score
-            return best_trajectory, best_score
 
     def generate_path(self):
         height, width = self.current_map.shape
