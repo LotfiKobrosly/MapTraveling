@@ -1,0 +1,2 @@
+# Map Traveling
+This repo contains a simplified map traveling structure with a randomly generated map with obstacles, as start point and a goal. The objective is to implement a continuous version of Nested Rollout Policy Adaptation.
