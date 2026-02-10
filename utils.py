@@ -18,7 +18,9 @@ def get_map(current_map, passage_points, goal):
                     if (i + step_1 >= 0) and (i + step_1 < height):
                         for step_2 in range(-1, 2):
                             if (j + step_2 >= 0) and (j + step_2 < width):
-                                image_to_show[i + step_1, j + step_2] = np.array([125, 255, 125])
+                                image_to_show[i + step_1, j + step_2] = np.array(
+                                    [125, 255, 125]
+                                )
 
             for point in passage_points[1:]:
                 if (i == point[0]) and (j == point[1]):
@@ -28,10 +30,16 @@ def get_map(current_map, passage_points, goal):
                         image_to_show[i, j] = np.array([255, 0, 0])
             start_point = passage_points[0]
             for step_1 in range(-1, 2):
-                if (start_point[0] + step_1 >= 0) and (start_point[0] + step_1 < height):
-                        for step_2 in range(-1, 2):
-                            if (start_point[1] + step_2 >= 0) and (start_point[1] + step_2 < width):
-                                image_to_show[start_point[0] + step_1, start_point[1] + step_2] = np.array([125, 125, 255])
+                if (start_point[0] + step_1 >= 0) and (
+                    start_point[0] + step_1 < height
+                ):
+                    for step_2 in range(-1, 2):
+                        if (start_point[1] + step_2 >= 0) and (
+                            start_point[1] + step_2 < width
+                        ):
+                            image_to_show[
+                                start_point[0] + step_1, start_point[1] + step_2
+                            ] = np.array([125, 125, 255])
             if (
                 (image_to_show[i, j, 0] == 1)
                 and (image_to_show[i, j, 1] == 1)
@@ -48,7 +56,8 @@ def cell_selector(position, angle):
         int(np.sin(angle) * STEP_SIZE) + position[1],
     )
 
-def get_intermediary_passage_points(start: tuple, end:tuple, current_map: np.ndarray):
+
+def get_intermediary_passage_points(start: tuple, end: tuple, current_map: np.ndarray):
     intermediary_passage_points = list()
     smaller_start_x, bigger_start_x = start[0], end[0]
     smaller_start_y, bigger_start_y = start[1], end[1]
@@ -66,7 +75,6 @@ def get_intermediary_passage_points(start: tuple, end:tuple, current_map: np.nda
         for j in range(smaller_start_y, bigger_start_y + 1):
             intermediary_passage_points.append([i, j])
     return intermediary_passage_points
-
 
 
 def play_scenario(frames):

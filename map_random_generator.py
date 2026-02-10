@@ -27,11 +27,11 @@ def generate_start_and_end_points(empty_map):
     height, width = np.shape(empty_map)
     # Start and goal, outside of obstacles
     while True:
-        start_point = [random.randint(0, height), random.randint(0, width)]
+        start_point = [random.randint(0, height - 1), random.randint(0, width - 1)]
         if empty_map[start_point[0], start_point[1]] == 0:
             break
     while True:
-        goal = [random.randint(0, height), random.randint(0, width)]
+        goal = [random.randint(0, height - 1), random.randint(0, width - 1)]
         if empty_map[goal[0], goal[1]] == 0:
             break
     return start_point, goal
