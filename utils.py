@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-STEP_SIZE = 5
+STEP_SIZE = 2
 
 
 def get_map(current_map, passage_points, goal):

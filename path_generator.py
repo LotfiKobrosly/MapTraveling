@@ -5,7 +5,12 @@ from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
 from utils import *
 
-RANDOM_STATE = np.random.default_rng(seed=42)
+RANDOM_SEED = 42
+RANDOM_STATE = np.random.default_rng(seed=RANDOM_SEED)
+LEARNING_RATE = 1e-3
+EPSILON = 1e-6
+ADAPTATION_RADIUS = 5
+N_GMM_COMPONENTS = 10
 
 
 def conditional_gaussian_1d(mu, Sigma, x_fixed):  # ChatGPT
@@ -68,6 +73,28 @@ def sample_conditional_gmm_sklearn(gmm, x_fixed, n_samples=1):  # ChatGPT
     return samples
 
 
+def gradient_log_covariance(sample, center, covariance): #ChatGPT
+    size = sample.shape[0]
+    inverted_covariance = np.linalg.inv(covariance)
+
+    delta = (sample - center).reshape(size, 1)
+
+    term = inverted_covariance @ delta @ delta.T @ inverted_covariance
+
+    return 0.5 * (term - inverted_covariance)
+
+def update_covariance(covariance, center, sample, score, learning_rate=LEARNING_RATE, epsilon=EPSILON): #ChatGPT
+    #print(covariance)
+    covariance += learning_rate * score * gradient_log_covariance(sample, center, covariance)
+
+    # Symmetrize
+    covariance = (covariance + covariance.T) / 2
+
+    # Numerical stability
+    covariance += epsilon * np.eye(3)
+    return covariance
+    #print(covariance)
+
 class PathGenerator(object):
 
     def __init__(self, current_map, start_point, goal, trajectory_size, strategy):
@@ -84,12 +111,6 @@ class PathGenerator(object):
         self.best_score = height * width
         if strategy == "nrpa":
             self.policy = dict()
-            """[
-                [
-                    dict() for j in range(width)
-                ]
-                for i in range(height)
-            ]"""
             self.nrpa_iterations = 0
 
     def is_finished(self):
@@ -125,7 +146,7 @@ class PathGenerator(object):
                         for (key, value) in policy.items()
                     ]
                 ).reshape(-1, 3)
-                model = GaussianMixture(3).fit(mixture_data)
+                model = GaussianMixture(N_GMM_COMPONENTS, random_state=RANDOM_STATE).fit(mixture_data)
                 normalized_angle = sample_conditional_gmm_sklearn(model, list(position))
             else:
                 normalized_angle = random.random()
@@ -142,15 +163,35 @@ class PathGenerator(object):
     ):
         if policy is None:
             policy = self.policy
+        if best_score is None:
+            best_score = self.best_score
+        best_score = np.exp(- best_score)
         for point_index, point in enumerate(best_trajectory[:-1]):
             i, j = point[0], point[1]
             current_policy = policy
             if current_policy:
+                
+                #print("Before")
+                #print(list(current_policy.values()))
+                restricted_policy = {
+                    key: value
+                    for key, value in current_policy.items()
+                    if np.sqrt((key[0] - i)**2 + (key[1] - j)**2) <= ADAPTATION_RADIUS
+                }
                 average_covariance = np.mean(
-                    np.array(list(current_policy.values())), axis=0
+                    np.array(list(restricted_policy.values())), axis=0
                 )
-                for key, value in current_policy.items():
-                    current_policy[key] = value * 10 / 9
+                for key, value in restricted_policy.items():
+                    current_policy[key] = update_covariance(
+                        value,
+                        np.array(key),
+                        np.array([i, j, self.code_action(best_course_of_actions[point_index])]),
+                        best_score
+                    )
+                    restricted_policy[key] = current_policy[key]
+                
+                #print("After")
+                #print(list(current_policy.values()))
                 if (
                     current_policy.get(
                         (i, j, self.code_action(best_course_of_actions[point_index])),
@@ -161,10 +202,7 @@ class PathGenerator(object):
                     current_policy[
                         (i, j, self.code_action(best_course_of_actions[point_index]))
                     ] = (average_covariance * 9 / 10)
-                else:
-                    current_policy[
-                        (i, j, self.code_action(best_course_of_actions[point_index]))
-                    ] *= (9 / 10) ** 2
+                
                 normalizing_factor = np.sum(
                     np.array(list(current_policy.values())), axis=0
                 )
@@ -173,9 +211,15 @@ class PathGenerator(object):
 
             else:
                 height, width = self.current_map.shape
+                random_matrix = np.array(
+                    [
+                        [RANDOM_STATE.uniform(0, 1, size=(1, 1)) for __ in range(3)]
+                        for _ in range(3)
+                    ]
+                ).reshape((3, 3))
                 current_policy[
                     (i, j, self.code_action(best_course_of_actions[point_index]))
-                ] = RANDOM_STATE.uniform([0, 0, 0], [1, 1, 1], size=(3, 3))
+                ] = random_matrix @ random_matrix.T
 
     def nrpa(self, level: int = 1, n_policies: int = 100):
 
