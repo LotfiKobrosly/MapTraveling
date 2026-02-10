@@ -146,7 +146,7 @@ class PathGenerator(object):
                         for (key, value) in policy.items()
                     ]
                 ).reshape(-1, 3)
-                model = GaussianMixture(N_GMM_COMPONENTS, random_state=RANDOM_STATE).fit(mixture_data)
+                model = GaussianMixture(N_GMM_COMPONENTS, random_state=RANDOM_SEED).fit(mixture_data)
                 normalized_angle = sample_conditional_gmm_sklearn(model, list(position))
             else:
                 normalized_angle = random.random()
