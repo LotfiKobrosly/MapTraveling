@@ -10,7 +10,7 @@ RANDOM_STATE = np.random.default_rng(seed=RANDOM_SEED)
 LEARNING_RATE = 1e-3
 EPSILON = 1e-6
 RELEVANCE_RADIUS = 10
-N_GMM_COMPONENTS = 50
+N_GMM_COMPONENTS = 10
 
 
 def conditional_gaussian_1d(mu, Sigma, x_fixed):  # ChatGPT
@@ -143,7 +143,7 @@ class PathGenerator(object):
                 RANDOM_STATE.multivariate_normal(
                     np.array(list(key)),
                     value,
-                    size=100,
+                    size=10,
                 )
                 for (key, value) in policy.items()
                 if np.linalg.norm(np.array(key[:2]) - np.array(position))
