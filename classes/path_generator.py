@@ -5,13 +5,6 @@ from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
 from utils import *
 
-RANDOM_SEED = 42
-RANDOM_STATE = np.random.default_rng(seed=RANDOM_SEED)
-LEARNING_RATE = 1e-3
-EPSILON = 1e-6
-RELEVANCE_RADIUS = 10
-N_GMM_COMPONENTS = 10
-
 
 def conditional_gaussian_1d(mu, Sigma, x_fixed):  # ChatGPT
     """

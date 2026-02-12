@@ -4,3 +4,4 @@ __pycache__*
 .ipynb_checkpoints*
 scratch_*
 *.jpeg
+export_pythonpath.sh
