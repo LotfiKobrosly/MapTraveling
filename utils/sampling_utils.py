@@ -3,6 +3,7 @@ from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
 from utils.constants import LEARNING_RATE, EPSILON
 
+
 def conditional_gaussian_1d(mu, Sigma, x_fixed):  # ChatGPT
     """
     mu: (3,)
@@ -66,9 +67,9 @@ def sample_conditional_gmm_sklearn(gmm, x_fixed, n_samples=1):  # ChatGPT
 def gradient_log_covariance(sample, center, covariance):  # ChatGPT
     size = sample.shape[0]
     try:
-    	inverted_covariance = np.linalg.inv(covariance)
+        inverted_covariance = np.linalg.inv(covariance)
     except:
-    	inverted_covariance = np.linalg.inv(covariance + EPSILON * np.eye(3))
+        inverted_covariance = np.linalg.inv(covariance + EPSILON * np.eye(3))
 
     delta = (sample - center).reshape(size, 1)
 

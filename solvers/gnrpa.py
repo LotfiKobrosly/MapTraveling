@@ -10,10 +10,17 @@ from utils.constants import (
     RANDOM_SEED,
     N_GMM_COMPONENTS,
     RANDOM_STATE,
+    TAU,
 )
 
+N_SAMPLES_TO_CHOOSE_FROM = 20
 
-def nrpa_step(position, policy):
+def compute_heuristic_value(position, goal, angle) -> float:
+    vector = np.array(list(goal)) - np.array(list(position))
+    return (vector @ np.array([np.cos(angle), np.sin(angle)]).T) / np.linalg.norm(vector)
+
+
+def gnrpa_step(position, goal, policy) -> float:
     mixture_data = [
         RANDOM_STATE.multivariate_normal(
             np.array(list(key)),
@@ -28,13 +35,16 @@ def nrpa_step(position, policy):
         model = GaussianMixture(N_GMM_COMPONENTS, random_state=RANDOM_SEED).fit(
             np.concatenate(mixture_data).reshape(-1, 3)
         )
-        normalized_angle = sample_conditional_gmm_sklearn(model, list(position))
+        normalized_angles = sample_conditional_gmm_sklearn(model, list(position), n_samples=N_SAMPLES_TO_CHOOSE_FROM)
+        probabilities = np.array([np.exp(model.predict(np.array([position[0], position[1], angle]).reshape((1, -1)))[0] + compute_heuristic_value(position, goal, 2 * np.pi * angle) / TAU) for angle in normalized_angles])
+        probabilities /= np.sum(probabilities)
+        return np.random.choice(normalized_angles, size=1, p=probabilities, replace=False)[0]
     else:
         normalized_angle = RANDOM_STATE.uniform(0, 1)
     return normalized_angle
 
 
-def adapt_policy_nrpa(best_trajectory, best_course_of_actions, policy, best_score):
+def adapt_policy_gnrpa(best_trajectory, best_course_of_actions, policy, best_score):
     best_score = np.exp(-best_score)
     for point_index, point in enumerate(best_trajectory[:-1]):
         i, j = point[0], point[1]

@@ -2,6 +2,7 @@ import random
 from copy import deepcopy
 import numpy as np
 from solvers.nrpa import *
+from solvers.gnrpa import *
 from utils.constants import *
 from utils.sampling_utils import *
 from utils.map_utils import *
@@ -21,7 +22,7 @@ class PathGenerator(object):
         self.actions = list()
         height, width = current_map.shape
         self.best_score = height * width
-        if strategy == "nrpa":
+        if strategy in ["nrpa", "gnrpa", "abgnrpa"]:
             self.policy = dict()
             self.nrpa_iterations = 0
 
@@ -44,6 +45,9 @@ class PathGenerator(object):
         elif self.strategy == "nrpa":
             normalized_angle = nrpa_step(self.current_position, self.policy)
 
+        elif self.strategy == "gnrpa":
+            normalized_angle = gnrpa_step(self.current_position, self.goal, self.policy)
+
         else:
             raise (ValueError("No strategy defined"))
 
@@ -51,7 +55,14 @@ class PathGenerator(object):
             self.current_position, normalized_angle * 2 * np.pi
         )
 
-    
+    def adapt_policy(self, best_trajectory, best_course_of_actions, policy, best_score):
+        if self.strategy == "nrpa":
+            return adapt_policy_nrpa(best_trajectory, best_course_of_actions, policy, best_score)
+        elif self.strategy == "gnrpa":
+            return adapt_policy_gnrpa(best_trajectory, best_course_of_actions, policy, best_score)
+        else:
+            raise ValueError("Wrong strategy for policy adaptation")
+
     def nrpa(self, level: int = 1, n_policies: int = 100):
 
         if level == 0:
@@ -72,9 +83,11 @@ class PathGenerator(object):
                     best_score = score
                     best_trajectory = deepcopy(self.trajectory)
                     best_course_of_actions = deepcopy(self.actions)
-                self.policy = adapt_policy(best_trajectory, best_course_of_actions, self.policy, best_score)
+                self.policy = self.adapt_policy(
+                    best_trajectory, best_course_of_actions, self.policy, best_score
+                )
             self.nrpa_iterations = iteration_number + 1
-            policy = adapt_policy(
+            policy = self.adapt_policy(
                 best_trajectory,
                 best_course_of_actions,
                 policy=policy,
@@ -133,3 +146,17 @@ class PathGenerator(object):
         return len(self.trajectory) + np.linalg.norm(
             np.array(self.goal) - np.array(self.current_position)
         )
+
+    def run(self, inputs: dict):
+        if self.strategy == "random_walk":
+            trajectories, scores = list(), list()
+            for _ in range(inputs["n_iterations"]):
+                self.generate_path()
+                trajectories.append(self.trajectory[:])
+                scores.append(self.get_score())
+                self.reinitialize()
+            best_score_index = np.argmin(scores)
+            self.trajectory = trajectories[best_score_index]
+            self.best_score = scores[best_score_index]
+        elif self.strategy in ["nrpa", "gnrpa"]:
+            self.nrpa(level=inputs["level"], n_policies=inputs["n_iterations"])
