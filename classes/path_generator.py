@@ -52,7 +52,13 @@ class PathGenerator(object):
             normalized_angle = gnrpa_step(self.current_position, self.goal, self.policy)
 
         elif self.strategy == "abgnrpa":
-            normalized_angle = abgnrpa_step(self.current_position, self.goal, self.policy, self.heuristic_values, self.get_score())
+            normalized_angle = abgnrpa_step(
+                self.current_position,
+                self.goal,
+                self.policy,
+                self.heuristic_values,
+                self.get_score(),
+            )
 
         else:
             raise (ValueError("No strategy defined"))
@@ -63,9 +69,13 @@ class PathGenerator(object):
 
     def adapt_policy(self, best_trajectory, best_course_of_actions, policy, best_score):
         if self.strategy == "nrpa":
-            return adapt_policy_nrpa(best_trajectory, best_course_of_actions, policy, best_score)
+            return adapt_policy_nrpa(
+                best_trajectory, best_course_of_actions, policy, best_score
+            )
         elif self.strategy in ["gnrpa", "abgnrpa"]:
-            return adapt_policy_gnrpa(best_trajectory, best_course_of_actions, policy, best_score)
+            return adapt_policy_gnrpa(
+                best_trajectory, best_course_of_actions, policy, best_score
+            )
         else:
             raise ValueError("Wrong strategy for policy adaptation")
 

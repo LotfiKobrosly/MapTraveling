@@ -1,5 +1,6 @@
 from utils.basic_functions import *
 
+
 class HeuristicValues(object):
 
     def __init__(self, bias_factor: float):
@@ -12,7 +13,9 @@ class HeuristicValues(object):
     def get(self, position, goal, angle):
         key = self.get_key(position, angle)
         if self.values.get(key, None) is None:
-            self.values[key] = self.bias_factor * compute_heuristic_value(position, goal, angle)
+            self.values[key] = self.bias_factor * compute_heuristic_value(
+                position, goal, angle
+            )
         return self.values[key]
 
     def set(self, position, angle, value):

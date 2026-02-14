@@ -33,4 +33,3 @@ if __name__ == "__main__":
         score = path_generator.get_score()
         play_scenario(path_generator.get_movement_frames(), strategy.upper(), score)
         print(strategy, " run done")
-
