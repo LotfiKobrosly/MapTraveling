@@ -3,9 +3,11 @@ from copy import deepcopy
 import numpy as np
 from solvers.nrpa import *
 from solvers.gnrpa import *
+from solvers.abgnrpa import *
 from utils.constants import *
 from utils.sampling_utils import *
 from utils.map_utils import *
+from classes.heuristic_values import HeuristicValues
 
 
 class PathGenerator(object):
@@ -25,6 +27,7 @@ class PathGenerator(object):
         if strategy in ["nrpa", "gnrpa", "abgnrpa"]:
             self.policy = dict()
             self.nrpa_iterations = 0
+            self.heuristic_values = HeuristicValues(bias_factor=1)
 
     def is_finished(self):
         return (
@@ -48,6 +51,9 @@ class PathGenerator(object):
         elif self.strategy == "gnrpa":
             normalized_angle = gnrpa_step(self.current_position, self.goal, self.policy)
 
+        elif self.strategy == "abgnrpa":
+            normalized_angle = abgnrpa_step(self.current_position, self.goal, self.policy, self.heuristic_values, self.get_score())
+
         else:
             raise (ValueError("No strategy defined"))
 
@@ -58,7 +64,7 @@ class PathGenerator(object):
     def adapt_policy(self, best_trajectory, best_course_of_actions, policy, best_score):
         if self.strategy == "nrpa":
             return adapt_policy_nrpa(best_trajectory, best_course_of_actions, policy, best_score)
-        elif self.strategy == "gnrpa":
+        elif self.strategy in ["gnrpa", "abgnrpa"]:
             return adapt_policy_gnrpa(best_trajectory, best_course_of_actions, policy, best_score)
         else:
             raise ValueError("Wrong strategy for policy adaptation")
@@ -158,5 +164,5 @@ class PathGenerator(object):
             best_score_index = np.argmin(scores)
             self.trajectory = trajectories[best_score_index]
             self.best_score = scores[best_score_index]
-        elif self.strategy in ["nrpa", "gnrpa"]:
+        elif self.strategy in ["nrpa", "gnrpa", "abgnrpa"]:
             self.nrpa(level=inputs["level"], n_policies=inputs["n_iterations"])

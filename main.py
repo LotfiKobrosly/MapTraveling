@@ -11,7 +11,7 @@ from classes.path_generator import PathGenerator
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 if __name__ == "__main__":
-    strategies = ["random_walk", "nrpa", "gnrpa"]
+    strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa"]
     n_obstacles_max = 5
     height_bounds = [100, 300]
     width_bounds = [100, 300]
@@ -32,4 +32,5 @@ if __name__ == "__main__":
         path_generator.run(inputs)
         score = path_generator.get_score()
         play_scenario(path_generator.get_movement_frames(), strategy.upper(), score)
+        print(strategy, " run done")
 

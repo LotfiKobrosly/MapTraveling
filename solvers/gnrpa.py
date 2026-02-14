@@ -11,9 +11,9 @@ from utils.constants import (
     N_GMM_COMPONENTS,
     RANDOM_STATE,
     TAU,
+    N_SAMPLES_TO_CHOOSE_FROM
 )
 
-N_SAMPLES_TO_CHOOSE_FROM = 20
 
 def compute_heuristic_value(position, goal, angle) -> float:
     vector = np.array(list(goal)) - np.array(list(position))
@@ -36,7 +36,7 @@ def gnrpa_step(position, goal, policy) -> float:
             np.concatenate(mixture_data).reshape(-1, 3)
         )
         normalized_angles = sample_conditional_gmm_sklearn(model, list(position), n_samples=N_SAMPLES_TO_CHOOSE_FROM)
-        probabilities = np.array([np.exp(model.predict(np.array([position[0], position[1], angle]).reshape((1, -1)))[0] + compute_heuristic_value(position, goal, 2 * np.pi * angle) / TAU) for angle in normalized_angles])
+        probabilities = np.array([np.exp(model.predict(np.array([position[0], position[1], angle]).reshape((1, -1)))[0] / TAU + compute_heuristic_value(position, goal, 2 * np.pi * angle)) for angle in normalized_angles])
         probabilities /= np.sum(probabilities)
         return np.random.choice(normalized_angles, size=1, p=probabilities, replace=False)[0]
     else:
