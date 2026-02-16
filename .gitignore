@@ -5,3 +5,4 @@ __pycache__*
 scratch_*
 *.jpeg
 export_pythonpath.sh
+*.xlsx
