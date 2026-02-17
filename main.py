@@ -32,18 +32,22 @@ if __name__ == "__main__":
     std_score = np.zeros((n_maps, len(strategies)))
     min_score = np.zeros((n_maps, len(strategies)))
 
-    for map_id in range(n_mapsœ):
-        print("\nRun n°", int(map_id), ":...")
+    for map_id in range(n_maps):
+        print("\nRun n°", str(map_id + 1), ":...")
 
         # Figures for map
-        map_figures_directory = figures_directory + "/" + "map_" + int(map_id)
+        map_figures_directory = figures_directory + "/" + "map_" + str(map_id)
         if not os.path.exists(map_figures_directory):
             os.mkdir(map_figures_directory)
+
+        # Map dimensions
+        height = 100
+        width = 100
         current_map = generate_random_map_with_rectangular_obstacles(
-            100, 100, n_obstacles_max
+            height, width, n_obstacles_max
         )
         start_point, goal = generate_start_and_end_points(current_map)
-        
+
         for strategy_id, strategy in enumerate(strategies):
             # Strategy per map saving directory
             strategy_map_directory = map_figures_directory + "/" + strategy.upper()
@@ -57,13 +61,13 @@ if __name__ == "__main__":
                     current_map, start_point, goal, trajectory_max_length, strategy
                 )
                 if strategy == "random_walk":
-                    inputs["n_iterations"] = 1e4
+                    inputs["n_iterations"] = int(1e4)
                 else:
                     inputs["n_iterations"] = 100
                 path_generator.run(inputs)
                 score = path_generator.get_score()
                 scores_list.append(score)
-                play_scenario(path_generator.get_movement_frames(), strategy_map_directory + "/run_" + int(run), score)
+                play_scenario(path_generator.get_movement_frames(), strategy_map_directory + "/run_" + str(run), score)
             mean_score[map_id, strategy_id] = np.mean(scores_list)
             std_score[map_id, strategy_id] = np.std(scores_list)
             min_score[map_id, strategy_id] = np.min(scores_list)
