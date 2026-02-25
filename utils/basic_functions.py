@@ -4,13 +4,21 @@ import numpy as np
 def code_action(angle: float):
     return round(angle, 3)
 
+
 def cosine_similarity(vector_1: np.ndarray, vector_2: np.ndarray) -> float:
-    return (vector_1 @ vector_2.T) / (np.linalg.norm(vector_1) * np.linalg.norm(vector_2))
+    return (vector_1 @ vector_2.T) / (
+        np.linalg.norm(vector_1) * np.linalg.norm(vector_2)
+    )
+
 
 def compute_heuristic_value(position: tuple, goal: tuple, angle: float) -> float:
-    return cosine_similarity(np.array(list(goal)) - np.array(list(position)), np.array([np.cos(angle), np.sin(angle)]))
+    return cosine_similarity(
+        np.array(list(goal)) - np.array(list(position)),
+        np.array([np.cos(angle), np.sin(angle)]),
+    )
 
-def gaussian_kernel_1d(sigma, radius=None): #ChatGPT
+
+def gaussian_kernel(sigma, radius=None):  # ChatGPT
     if radius is None:
         radius = int(3 * sigma)
 

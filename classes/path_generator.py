@@ -4,6 +4,8 @@ import numpy as np
 from solvers.nrpa import *
 from solvers.gnrpa import *
 from solvers.abgnrpa import *
+from solvers.mcts import *
+from solvers.crave import compute_rave_uct, compute_grave_uct
 from utils.constants import *
 from utils.sampling_utils import *
 from utils.map_utils import *
@@ -28,6 +30,17 @@ class PathGenerator(object):
             self.policy = dict()
             self.nrpa_iterations = 0
             self.heuristic_values = HeuristicValues(bias_factor=1)
+        if strategy in ["mcts", "crave", "cgrave"]:
+            self.states_values = {
+                tuple(start_point): {
+                    "n_visits": 0,
+                    "cumulative_score": 0,
+                    "mean_score": 0,
+                    "children": list(),
+                }
+            }
+            self.expanded = False
+            self.reference_state = start_point
 
     def is_finished(self):
         return (
@@ -40,10 +53,14 @@ class PathGenerator(object):
         self.current_position = self.start_point
         self.current_steps = 0
         self.trajectory = [self.start_point]
+        if self.strategy in ["mcts", "crave", "cgrave"]:
+            self.expanded = False
+            self.reference_state = self.start_point
 
     def step(self):
         if self.strategy == "random_walk":
-            normalized_angle = RANDOM_STATE.uniform(0, 1)
+            height, width = self.current_map.shape
+            return random_simulation(self.current_position, self.current_map)
 
         elif self.strategy == "nrpa":
             normalized_angle = nrpa_step(self.current_position, self.policy)
@@ -66,6 +83,12 @@ class PathGenerator(object):
         return normalized_angle, cell_selector(
             self.current_position, normalized_angle * 2 * np.pi
         )
+
+    def update(self, angle, new_cell):
+        self.current_steps += 1
+        self.current_position = new_cell
+        self.trajectory.append(new_cell)
+        self.actions.append(angle)
 
     def adapt_policy(self, best_trajectory, best_course_of_actions, policy, best_score):
         if self.strategy == "nrpa":
@@ -113,37 +136,75 @@ class PathGenerator(object):
             self.trajectory = best_trajectory
             self.best_score = best_score
 
+    def mcts(self, n_iterations: int = 10000):
+        """
+        Continuous MCTS with Progressive Widening
+        """
+        best_trajectory = None
+        best_score = self.best_score
+        for iteration_number in range(n_iterations):
+            self.reinitialize()
+            while not self.is_finished():
+                if self.expanded:
+                    angle, new_cell = random_simulation(self.current_position, self.current_map)
+                
+                else:
+                    current_node = self.states_values[tuple(self.current_position)]
+                    if current_node["n_visits"] ** PROGRESSIVE_WIDENING_PARAMETER >= len(current_node["children"]):
+                        angle, new_cell = random_simulation(self.current_position, self.current_map)
+                        current_node["children"].append(new_cell)
+                        if self.states_values.get(tuple(new_cell), None) is None:
+                            self.states_values[tuple(new_cell)] = {
+                                "n_visits": 1,
+                                "cumulative_score": 0,
+                                "mean_score": 0,
+                                "children": list(),
+                            }
+                        else:
+                            self.states_values[tuple(new_cell)]["n_visits"] += 1
+                        self.expanded = True
+                    else:
+                        current_node["n_visits"] += 1
+                        probabilites = np.zeros(len(current_node["children"]))
+                        for (child_id, child) in enumerate(current_node["children"]):
+                            #print(child_id, child)
+                            if self.strategy == "mcts":
+                                probabilites[child_id] = compute_uct(self.current_position, child, self.states_values)
+                            elif self.strategy == "crave":
+                                probabilites[child_id] = compute_rave_uct(self.current_position, child, self.states_values)
+                            elif self.strategy == "cgrave":
+                                if current_node["n_visits"] > N_VISITS_REFERENCE:
+                                    self.reference_state = self.current_position
+                                probabilites[child_id] = compute_grave_uct(self.current_position, child, self.reference_state, self.states_values)
+                            else:
+                                raise ValueError("Wrong strategy chosen: " + self.strategy.upper())
+                            if not np.isfinite(probabilites[child_id]):
+                                probabilites[child_id] = 1
+                        angle = None
+                        #print(probabilites)
+                        probabilites /= np.sum(probabilites)
+                        candidate_ids = np.arange(len(current_node["children"]))
+                        new_cell = current_node["children"][np.random.choice(candidate_ids, size=1, p=probabilites)[0]]
+                        
+                self.update(angle, new_cell)
+            score = self.get_score()
+            backpropagation(self.trajectory, self.states_values, score, iteration_number)
+
+            if score < best_score:
+                best_trajectory = self.trajectory[:]
+                best_score = score
+
+        self.best_score = best_score
+        self.trajectory = best_trajectory
+
+
+
     def generate_path(self):
-        height, width = self.current_map.shape
 
         self.trajectory = [self.start_point]
         while not self.is_finished():
-            next_cell_found = False
-            while not next_cell_found:
-                angle, new_cell = self.step()
-                if (
-                    (new_cell[0] >= 0)
-                    and (new_cell[0] < height)
-                    and (new_cell[1] >= 0)
-                    and (new_cell[1] < width)
-                    and (self.current_map[new_cell[0], new_cell[1]] != 1)
-                ):
-                    next_cell_found = True
-                    intermediary_passage_points = get_intermediary_passage_points(
-                        self.current_position, new_cell, self.current_map
-                    )
-                    for point in intermediary_passage_points:
-                        if self.current_map[point[0], point[1]] == 1:
-                            next_cell_found = False
-                            break
-                    if not next_cell_found:
-                        continue
-                    break
-
-            self.current_steps += 1
-            self.current_position = new_cell
-            self.trajectory.append(new_cell)
-            self.actions.append(angle)
+            angle, new_cell = random_simulation(self.current_position, self.current_map)
+            self.update(angle, new_cell)
 
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]
@@ -176,3 +237,5 @@ class PathGenerator(object):
             self.best_score = scores[best_score_index]
         elif self.strategy in ["nrpa", "gnrpa", "abgnrpa"]:
             self.nrpa(level=inputs["level"], n_policies=inputs["n_iterations"])
+        elif self.strategy in ["mcts", "crave", "cgrave"]:
+            self.mcts(n_iterations=inputs["n_iterations"])
