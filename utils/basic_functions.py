@@ -5,6 +5,10 @@ def code_action(angle: float):
     return round(angle, 3)
 
 
+def code_state(position: list):
+    return (code_action(position[0]), code_action(position[1]))
+
+
 def cosine_similarity(vector_1: np.ndarray, vector_2: np.ndarray) -> float:
     return (vector_1 @ vector_2.T) / (
         np.linalg.norm(vector_1) * np.linalg.norm(vector_2)
