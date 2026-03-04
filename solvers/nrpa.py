@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 
-from utils.basic_functions import code_action,cosine_similarity
+from utils.basic_functions import code_action, cosine_similarity
 from utils.sampling_utils import *
 from utils.map_utils import cell_is_reachable, cell_selector
 from utils.constants import (
@@ -17,14 +17,20 @@ from utils.constants import (
 )
 
 
-def nrpa_step(position, current_map, policy, sampling_method: str = "GaussianMixture", sampling_radius=RELEVANCE_RADIUS / 4):
+def nrpa_step(
+    position,
+    current_map,
+    policy,
+    sampling_method: str = "GaussianMixture",
+    sampling_radius=RELEVANCE_RADIUS / 4,
+):
     relevant_points = {
         key: value
         for (key, value) in policy.items()
         if np.linalg.norm(np.array(key[:2]) - np.array(position)) <= RELEVANCE_RADIUS
     }
     if len(relevant_points) > 0:
-        #print(relevant_points)
+        # print(relevant_points)
         if sampling_method == "GaussianMixture":
             print("GaussianMixture")
             mixture_data = [
@@ -41,7 +47,7 @@ def nrpa_step(position, current_map, policy, sampling_method: str = "GaussianMix
             )
             normalized_angle = sample_conditional_gmm_sklearn(model, list(position))
         else:
-            #print(sampling_method)
+            # print(sampling_method)
             x_data = np.zeros((len(relevant_points), 2))
             y_data = np.zeros((len(relevant_points)))
             for counter, (key, value) in enumerate(relevant_points.items()):
@@ -119,7 +125,10 @@ def adapt_policy_nrpa(
                 for position, previous_angle in restricted_policy.items():
                     policy[position] += (
                         LEARNING_RATE
-                        * min((1 / np.linalg.norm(np.array(position) - np.array(point))), 1)
+                        * min(
+                            (1 / np.linalg.norm(np.array(position) - np.array(point))),
+                            1,
+                        )
                         * (best_course_of_actions[point_index] - previous_angle)
                     )
                 if (i, j) not in policy.keys():

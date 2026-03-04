@@ -25,14 +25,19 @@ def compute_heuristic_value(position, goal, angle) -> float:
 
 
 def gnrpa_step(
-    position, goal, current_map, policy, sampling_method: str = "GaussianMixture", sampling_radius=RELEVANCE_RADIUS / 4
+    position,
+    goal,
+    current_map,
+    policy,
+    sampling_method: str = "GaussianMixture",
+    sampling_radius=RELEVANCE_RADIUS / 4,
 ) -> float:
     relevant_points = {
         key: value
         for (key, value) in policy.items()
         if np.linalg.norm(np.array(key[:2]) - np.array(position)) <= RELEVANCE_RADIUS
     }
-    #print(policy)
+    # print(policy)
     if len(relevant_points) > 0:
         if sampling_method == "GaussianMixture":
             mixture_data = [
@@ -73,7 +78,7 @@ def gnrpa_step(
 
             # Unbiased estimator
             sigma = max(np.sqrt(np.sum(residuals**2) / (len(y_data))), sampling_radius)
-            #print(sigma)
+            # print(sigma)
             mean = model.predict(np.array(list(position)).reshape(1, -1))[0]
             normalized_angles = list()
             while len(normalized_angles) == 0:
@@ -85,43 +90,56 @@ def gnrpa_step(
                     for angle in normalized_angles
                     if cell_is_reachable(cell_selector(position, angle), current_map)
                 ]
-            weights = np.array([
-                (
-                    -0.5 * np.log(2 * np.pi)
-                    - np.log(sigma)
-                    - 0.5 * ((angle - mean) / sigma) ** 2
-                )
-                for angle in normalized_angles
-            ])
-        
+            weights = np.array(
+                [
+                    (
+                        -0.5 * np.log(2 * np.pi)
+                        - np.log(sigma)
+                        - 0.5 * ((angle - mean) / sigma) ** 2
+                    )
+                    for angle in normalized_angles
+                ]
+            )
 
     else:
         normalized_angles = list()
         while len(normalized_angles) == 0:
-            normalized_angles = RANDOM_STATE.uniform(0, 1, size=N_SAMPLES_TO_CHOOSE_FROM)
-            candidates = [
-                cell_selector(position, angle)
-                for angle in normalized_angles
-            ]
+            normalized_angles = RANDOM_STATE.uniform(
+                0, 1, size=N_SAMPLES_TO_CHOOSE_FROM
+            )
+            candidates = [cell_selector(position, angle) for angle in normalized_angles]
             normalized_angles = [
                 angle
                 for angle in normalized_angles
                 if cell_is_reachable(cell_selector(position, angle), current_map)
             ]
         weights = np.ones(len(normalized_angles)) / len(normalized_angles)
-    heuristic_values = np.array([
-        compute_heuristic_value(position, goal, 2 * np.pi * angle)
-        for angle in normalized_angles
-    ])
-    heuristic_values = heuristic_values / np.sum(np.absolute(heuristic_values))
-    probabilities = np.exp(
-        weights / TAU + heuristic_values * 10
+    heuristic_values = np.array(
+        [
+            compute_heuristic_value(position, goal, 2 * np.pi * angle)
+            for angle in normalized_angles
+        ]
     )
+    heuristic_values = heuristic_values / np.sum(np.absolute(heuristic_values))
+    probabilities = np.exp(weights / TAU + heuristic_values * 10)
     probabilities /= np.sum(probabilities)
     # Printing for debug
     for angle_number, angle in enumerate(normalized_angles):
-        if np.isnan(weights[angle_number]) or np.isnan(heuristic_values[angle_number]) or np.isnan(probabilities[angle_number]):
-            print("Angle ", angle, " has weight ", weights[angle_number], ", bias ", heuristic_values[angle_number], " and thus probability ", probabilities[angle_number])
+        if (
+            np.isnan(weights[angle_number])
+            or np.isnan(heuristic_values[angle_number])
+            or np.isnan(probabilities[angle_number])
+        ):
+            print(
+                "Angle ",
+                angle,
+                " has weight ",
+                weights[angle_number],
+                ", bias ",
+                heuristic_values[angle_number],
+                " and thus probability ",
+                probabilities[angle_number],
+            )
             print(policy)
     for angle in normalized_angles:
         new_cell = cell_selector(position, angle)
@@ -182,10 +200,13 @@ def adapt_policy_gnrpa(
                 for position, previous_angle in restricted_policy.items():
                     variation = (
                         LEARNING_RATE
-                        * min((1 / np.linalg.norm(np.array(position) - np.array(point))), 1)
+                        * min(
+                            (1 / np.linalg.norm(np.array(position) - np.array(point))),
+                            1,
+                        )
                         * (best_course_of_actions[point_index] - previous_angle)
                     )
-                    #print(variation)
+                    # print(variation)
                     policy[position] += variation
                 if (i, j) not in policy.keys():
                     policy[(i, j)] = best_course_of_actions[point_index]

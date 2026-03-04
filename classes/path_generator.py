@@ -71,11 +71,13 @@ class PathGenerator(object):
                 }
             }
             self.actions_values = {
-                angle: {
-                    "n_visits": 0,
-                    "cumulative_score": 0,
+                tuple(start_point): {
+                    angle: {
+                        "n_visits": 0,
+                        "cumulative_score": 0,
+                    }
+                    for angle in DISCRETE_ACTIONS
                 }
-                for angle in DISCRETE_ACTIONS
             }
 
     def is_finished(self):
@@ -100,13 +102,22 @@ class PathGenerator(object):
 
         elif self.strategy == "nrpa":
             normalized_angle = nrpa_step(
-                self.current_position, self.current_map, self.policy, self.sampling_method, sampling_radius=RELEVANCE_RADIUS / np.sqrt(self.nrpa_iterations)
+                self.current_position,
+                self.current_map,
+                self.policy,
+                self.sampling_method,
+                sampling_radius=RELEVANCE_RADIUS / self.nrpa_iterations,
             )
 
         elif self.strategy == "gnrpa":
             policy = self.policy
             normalized_angle = gnrpa_step(
-                self.current_position, self.goal, self.current_map, policy, self.sampling_method, sampling_radius=RELEVANCE_RADIUS / np.sqrt(self.nrpa_iterations)
+                self.current_position,
+                self.goal,
+                self.current_map,
+                policy,
+                self.sampling_method,
+                sampling_radius=RELEVANCE_RADIUS / self.nrpa_iterations,
             )
 
         elif self.strategy == "abgnrpa":
@@ -118,31 +129,29 @@ class PathGenerator(object):
                 self.heuristic_values,
                 1 - self.get_score() / self.score_normalizer,
                 self.sampling_method,
-                sampling_radius=RELEVANCE_RADIUS / np.sqrt(self.nrpa_iterations),
+                sampling_radius=RELEVANCE_RADIUS / self.nrpa_iterations,
             )
 
         else:
             raise (ValueError("No strategy defined"))
 
-        return normalized_angle, cell_selector(
-            self.current_position, normalized_angle
-        )
+        return normalized_angle, cell_selector(self.current_position, normalized_angle)
 
     def update(self, angle, new_cell):
         self.current_steps += 1
         self.current_position = new_cell
         self.trajectory.append(new_cell)
         self.actions.append(angle)
-        if self.strategy in ["rave", "grave"]:
-            self.actions_values[angle]["n_visits"] += 1
 
     def generate_path(self):
 
         self.trajectory = [self.start_point]
         while not self.is_finished():
             angle, new_cell = self.step()
-            #print("From position: ", self.current_position, ", angle is ", angle, " and new cell is ", new_cell)
-            assert cell_is_reachable(new_cell, self.current_map), "Position " + str(new_cell) + " out of bounds OR inside obstacle"
+            # print("From position: ", self.current_position, ", angle is ", angle, " and new cell is ", new_cell)
+            assert cell_is_reachable(new_cell, self.current_map), (
+                "Position " + str(new_cell) + " out of bounds OR inside obstacle"
+            )
             self.update(angle, new_cell)
 
     def adapt_policy(
@@ -181,7 +190,12 @@ class PathGenerator(object):
             best_course_of_actions = deepcopy(self.actions)
             policy = deepcopy(self.policy)
             for iteration_number in range(n_policies):
-                print("Before iteration ", iteration_number + 1, " size of policy: ", len(self.policy))
+                print(
+                    "Before iteration ",
+                    iteration_number + 1,
+                    " size of policy: ",
+                    len(self.policy),
+                )
                 self.reinitialize()
                 self.nrpa(level - 1, n_policies)
                 score = self.get_score()
@@ -224,10 +238,12 @@ class PathGenerator(object):
             self.states_values[tuple(self.current_position)]["unvisited_children"] = (
                 discrete_possible_moves(self.current_position, self.current_map)
             )
+        trajectory_evolution, score_evolution = list(), list()
         # print(len(self.states_values[tuple(self.current_position)]["unvisited_children"]))
         for iteration_number in range(n_iterations):
             self.reinitialize()
             visited_states = {tuple(self.start_point)}
+            reference_position = self.start_point
 
             # Selection
             selection_length = 0
@@ -254,7 +270,10 @@ class PathGenerator(object):
                         self.states_values,
                     )
                     normalized_angle = None
-                elif self.strategy == "rave":
+                elif self.strategy in ["rave", "grave"]:
+                    grave = False
+                    if self.strategy == "grave":
+                        grave = True
                     normalized_angle, new_cell = discrete_rave_selection(
                         self.current_position,
                         {
@@ -266,15 +285,19 @@ class PathGenerator(object):
                         },
                         self.states_values,
                         self.actions_values,
+                        grave,
+                        N_VISITS_REFERENCE,
+                        reference_position,
                     )
-                elif self.strategy == "grave":
-                    pass
                 else:
                     raise ValueError("Strategy in discrete MCTS ill-defined")
                 if new_cell is None:
                     no_cell_found = True
                     break
                 # print("Before update: ", new_cell, " vs ", self.current_position)
+                self.actions_values[tuple(self.current_position)][normalized_angle][
+                    "n_visits"
+                ] += 1
                 self.update(normalized_angle, new_cell)
                 assert (
                     new_cell not in visited_states
@@ -332,6 +355,13 @@ class PathGenerator(object):
                         "cumulative_score": 0,
                         "mean_score": 0,
                     }
+                    self.actions_values[tuple(new_cell)] = {
+                        angle: {
+                            "n_visits": 0,
+                            "cumulative_score": 0,
+                        }
+                        for angle in DISCRETE_ACTIONS
+                    }
                     if self.strategy == "mcts":
                         self.states_values[tuple(new_cell)]["children"] = list()
                         self.states_values[tuple(new_cell)]["unvisited_children"] = (
@@ -377,9 +407,13 @@ class PathGenerator(object):
 
             # Backpropagation
             score = self.get_score()
-            backpropagation(self.trajectory, self.states_values, score)
+            backpropagation(
+                self.trajectory, self.states_values, score / self.score_normalizer
+            )
             if self.strategy in ["rave", "grave"]:
-                rave_backpropagation(self.actions, self.actions_values, score)
+                rave_backpropagation(
+                    self.actions, self.actions_values, score / self.score_normalizer
+                )
 
             if (iteration_number + 1) % 100 == 0:
                 print("At iteration ", iteration_number + 1)
@@ -393,11 +427,28 @@ class PathGenerator(object):
             if score < best_score:
                 best_trajectory = self.trajectory[:]
                 best_score = score
-                print("New best score found at iteration", iteration_number + 1 ,": ", best_score)
+                print(
+                    "New best score found at iteration",
+                    iteration_number + 1,
+                    ": ",
+                    best_score,
+                )
+                trajectory_evolution.append(self.get_trajectory_frame())
+            score_evolution.append(best_score)
 
         self.best_score = best_score
         self.trajectory = best_trajectory
         # print("Trajectory length: ", len(self.trajectory))
+
+        # Plotting score_evolution
+        figure = plt.figure()
+        timer = figure.canvas.new_timer(interval=10000)
+        timer.add_callback(plt.close)
+        timer.start()
+        plt.plot(score_evolution)
+        plt.show()
+        plt.close()
+        play_scenario(trajectory_evolution, "MCTS", best_score, wait_time=1)
 
     def cmcts(self, n_iterations: int = 10000):
         """

@@ -96,12 +96,13 @@ def update_covariance(
     covariance += epsilon * np.eye(3)
     return covariance
 
+
 def get_model(sampling_method: str = "LinearRegression"):
     if sampling_method == "RidgeRegression":
         return ridge_regression()
     elif sampling_method == "NeuralNetwork":
         return MLPRegressor(**MLP_PARAMETERS)
-    elif sampling_method == "xgboost":
+    elif sampling_method == "XGBoost":
         return XGBRegressor()
     else:
         return LinearRegression()

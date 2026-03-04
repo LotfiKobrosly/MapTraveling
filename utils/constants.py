@@ -16,22 +16,28 @@ RELEVANCE_RADIUS = 10
 LEARNING_RATE = 0.1
 
 # GNRPA and ABGNRPA parameters
-GAMMA = 0.1
+GAMMA = 0.01
 TAU = 10
 N_SAMPLES_TO_CHOOSE_FROM = 20
-SAMPLING_METHODS = ["GaussianMixture", "LinearRegression", "RidgeRegrression", "MLP"]
+SAMPLING_METHODS = [
+    "GaussianMixture",
+    "LinearRegression",
+    "RidgeRegrression",
+    "MLP",
+    "XGBoost",
+]
 MLP_SHAPE = (100,)
 MLP_LOSS = "squared_error"
 MLP_ACTIVATION = "relu"
 MLP_SOLVER = "adam"
 MLP_LEARNING_RATE = 0.001
 MLP_PARAMETERS = {
-	"loss": MLP_LOSS,
-	"learning_rate" : "constant",
-	"learning_rate_init": MLP_LEARNING_RATE,
-	"hidden_layer_sizes": MLP_SHAPE,
-	"activation": MLP_ACTIVATION,
-	"solver": MLP_SOLVER,
+    "loss": MLP_LOSS,
+    "learning_rate": "constant",
+    "learning_rate_init": MLP_LEARNING_RATE,
+    "hidden_layer_sizes": MLP_SHAPE,
+    "activation": MLP_ACTIVATION,
+    "solver": MLP_SOLVER,
 }
 
 # Gaussian convolution
@@ -41,7 +47,9 @@ ACTION_DISTANCE_PARAMETER = 50
 # MCTS, RAVE and GRAVE
 EXPLORATION_CONSTANT = np.sqrt(2)
 N_DISCRETE_ACTIONS = 20
-DISCRETE_ACTIONS = [round(action, 3) for action in np.arange(0, 1, 1 / N_DISCRETE_ACTIONS)]
+DISCRETE_ACTIONS = [
+    round(action, 3) for action in np.arange(0, 1, 1 / N_DISCRETE_ACTIONS)
+]
 
 # cMCTS and cRAVE/ cGRAVE parameters
 PROGRESSIVE_WIDENING_PARAMETER = 0.5

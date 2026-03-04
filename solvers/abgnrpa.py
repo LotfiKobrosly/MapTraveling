@@ -33,7 +33,7 @@ def abgnrpa_step(
         for (key, value) in policy.items()
         if np.linalg.norm(np.array(key[:2]) - np.array(position)) <= RELEVANCE_RADIUS
     }
-    #print(policy)
+    # print(policy)
     if len(relevant_points) > 0:
         if sampling_method == "GaussianMixture":
             mixture_data = [
@@ -74,7 +74,7 @@ def abgnrpa_step(
 
             # Unbiased estimator
             sigma = max(np.sqrt(np.sum(residuals**2) / (len(y_data))), sampling_radius)
-            #print(sigma)
+            # print(sigma)
             mean = model.predict(np.array(list(position)).reshape(1, -1))[0]
             normalized_angles = list()
             while len(normalized_angles) == 0:
@@ -86,38 +86,35 @@ def abgnrpa_step(
                     for angle in normalized_angles
                     if cell_is_reachable(cell_selector(position, angle), current_map)
                 ]
-            weights = np.array([
-                (
-                    -0.5 * np.log(2 * np.pi)
-                    - np.log(sigma)
-                    - 0.5 * ((angle - mean) / sigma) ** 2
-                )
-                for angle in normalized_angles
-            ])
-        
+            weights = np.array(
+                [
+                    (
+                        -0.5 * np.log(2 * np.pi)
+                        - np.log(sigma)
+                        - 0.5 * ((angle - mean) / sigma) ** 2
+                    )
+                    for angle in normalized_angles
+                ]
+            )
 
     else:
         normalized_angles = list()
         while len(normalized_angles) == 0:
-            normalized_angles = RANDOM_STATE.uniform(0, 1, size=N_SAMPLES_TO_CHOOSE_FROM)
-            candidates = [
-                cell_selector(position, angle)
-                for angle in normalized_angles
-            ]
+            normalized_angles = RANDOM_STATE.uniform(
+                0, 1, size=N_SAMPLES_TO_CHOOSE_FROM
+            )
+            candidates = [cell_selector(position, angle) for angle in normalized_angles]
             normalized_angles = [
                 angle
                 for angle in normalized_angles
                 if cell_is_reachable(cell_selector(position, angle), current_map)
             ]
         weights = np.ones(len(normalized_angles)) / len(normalized_angles)
-    biases = np.array([
-        heuristic_values.get(position, goal, angle)
-        for angle in normalized_angles
-    ])
-    biases = biases / np.sum(np.absolute(biases))
-    probabilities = np.exp(
-        weights / TAU + biases * 10
+    biases = np.array(
+        [heuristic_values.get(position, goal, angle) for angle in normalized_angles]
     )
+    biases = biases / np.sum(np.absolute(biases))
+    probabilities = np.exp(weights / TAU + biases * 10)
     probabilities /= np.sum(probabilities)
     normalized_angle = np.random.choice(
         normalized_angles, size=1, p=probabilities, replace=False

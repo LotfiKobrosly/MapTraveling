@@ -13,13 +13,14 @@ from classes.path_generator import PathGenerator
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 if __name__ == "__main__":
-    strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa"]
+    strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa", "mcts", "crave", "cgrave"]
+    strategies = ["random_walk", "mcts", "crave", "cgrave"]
     n_obstacles_max = 5
     height_bounds = [100, 300]
     width_bounds = [100, 300]
-    trajectory_max_length = 400
-    n_maps = 10
-    n_runs = 10
+    trajectory_max_length = 800
+    n_maps = 1
+    n_runs = 1
     inputs = {"level": 1}
 
     # Figures saving main directory
@@ -61,7 +62,9 @@ if __name__ == "__main__":
                     current_map, start_point, goal, trajectory_max_length, strategy
                 )
                 if strategy == "random_walk":
-                    inputs["n_iterations"] = int(1e4)
+                    inputs["n_iterations"] = 1000
+                elif strategy in ["mcts", "crave", "cgrave"]:
+                    inputs["n_iterations"] = 200000
                 else:
                     inputs["n_iterations"] = 100
                 path_generator.run(inputs)
