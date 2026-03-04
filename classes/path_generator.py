@@ -14,12 +14,22 @@ from classes.heuristic_values import HeuristicValues
 
 class PathGenerator(object):
 
-    def __init__(self, current_map, start_point, goal, trajectory_size, strategy):
+    def __init__(
+        self,
+        current_map,
+        start_point,
+        goal,
+        trajectory_size,
+        strategy,
+        sampling_method="GaussianMixture",
+        bias_factor=1,
+    ):
         self.current_map = current_map
         self.start_point = start_point
         self.goal = goal
         self.trajectory_size = trajectory_size
         self.strategy = strategy
+        self.sampling_method = sampling_method
         self.current_position = start_point
         self.current_steps = 0
         self.trajectory = [self.start_point]
@@ -30,7 +40,7 @@ class PathGenerator(object):
         if strategy in ["nrpa", "gnrpa", "abgnrpa"]:
             self.policy = dict()
             self.nrpa_iterations = 0
-            self.heuristic_values = HeuristicValues(bias_factor=1)
+            self.heuristic_values = HeuristicValues(bias_factor)
         if strategy in ["mcts", "crave", "cgrave"]:
             self.states_values = {
                 tuple(start_point): {
@@ -45,12 +55,28 @@ class PathGenerator(object):
                 angle: {
                     "n_visits": 0,
                     "cumulative_score": 0,
-                    "mean_score": 0,
                 }
                 for angle in DISCRETE_ACTIONS
             }
             self.expanded = False
             self.reference_state = start_point
+        if strategy in ["rave", "grave"]:
+            self.states_values = {
+                tuple(start_point): {
+                    "n_visits": 0,
+                    "cumulative_score": 0,
+                    "mean_score": 0,
+                    "children": dict(),
+                    "unvisited_children": dict(),
+                }
+            }
+            self.actions_values = {
+                angle: {
+                    "n_visits": 0,
+                    "cumulative_score": 0,
+                }
+                for angle in DISCRETE_ACTIONS
+            }
 
     def is_finished(self):
         return (
@@ -63,7 +89,7 @@ class PathGenerator(object):
         self.current_position = self.start_point
         self.current_steps = 0
         self.trajectory = [self.start_point]
-        if self.strategy in ["mcts", "crave", "cgrave"]:
+        if self.strategy in ["mcts", "rave", "grave", "crave", "cgrave"]:
             self.expanded = False
             self.reference_state = self.start_point
 
@@ -73,25 +99,33 @@ class PathGenerator(object):
             return continuous_random_simulation(self.current_position, self.current_map)
 
         elif self.strategy == "nrpa":
-            normalized_angle = nrpa_step(self.current_position, self.policy)
+            normalized_angle = nrpa_step(
+                self.current_position, self.current_map, self.policy, self.sampling_method, sampling_radius=RELEVANCE_RADIUS / np.sqrt(self.nrpa_iterations)
+            )
 
         elif self.strategy == "gnrpa":
-            normalized_angle = gnrpa_step(self.current_position, self.goal, self.policy)
+            policy = self.policy
+            normalized_angle = gnrpa_step(
+                self.current_position, self.goal, self.current_map, policy, self.sampling_method, sampling_radius=RELEVANCE_RADIUS / np.sqrt(self.nrpa_iterations)
+            )
 
         elif self.strategy == "abgnrpa":
             normalized_angle = abgnrpa_step(
                 self.current_position,
                 self.goal,
+                self.current_map,
                 self.policy,
                 self.heuristic_values,
                 1 - self.get_score() / self.score_normalizer,
+                self.sampling_method,
+                sampling_radius=RELEVANCE_RADIUS / np.sqrt(self.nrpa_iterations),
             )
 
         else:
             raise (ValueError("No strategy defined"))
 
         return normalized_angle, cell_selector(
-            self.current_position, normalized_angle * 2 * np.pi
+            self.current_position, normalized_angle
         )
 
     def update(self, angle, new_cell):
@@ -99,17 +133,36 @@ class PathGenerator(object):
         self.current_position = new_cell
         self.trajectory.append(new_cell)
         self.actions.append(angle)
+        if self.strategy in ["rave", "grave"]:
+            self.actions_values[angle]["n_visits"] += 1
+
+    def generate_path(self):
+
+        self.trajectory = [self.start_point]
+        while not self.is_finished():
+            angle, new_cell = self.step()
+            #print("From position: ", self.current_position, ", angle is ", angle, " and new cell is ", new_cell)
+            assert cell_is_reachable(new_cell, self.current_map), "Position " + str(new_cell) + " out of bounds OR inside obstacle"
+            self.update(angle, new_cell)
 
     def adapt_policy(
         self, best_trajectory, best_course_of_actions, policy, score_difference
     ):
         if self.strategy == "nrpa":
             return adapt_policy_nrpa(
-                best_trajectory, best_course_of_actions, policy, score_difference
+                best_trajectory,
+                best_course_of_actions,
+                policy,
+                score_difference,
+                self.sampling_method,
             )
         elif self.strategy in ["gnrpa", "abgnrpa"]:
             return adapt_policy_gnrpa(
-                best_trajectory, best_course_of_actions, policy, score_difference
+                best_trajectory,
+                best_course_of_actions,
+                policy,
+                score_difference,
+                self.sampling_method,
             )
         else:
             raise ValueError("Wrong strategy for policy adaptation")
@@ -117,8 +170,8 @@ class PathGenerator(object):
     def nrpa(self, level: int = 1, n_policies: int = 100):
 
         if level == 0:
-            self.generate_path()
             self.nrpa_iterations += 1
+            self.generate_path()
 
         else:
             iteration_number = self.nrpa_iterations
@@ -127,7 +180,8 @@ class PathGenerator(object):
             best_trajectory = deepcopy(self.trajectory)
             best_course_of_actions = deepcopy(self.actions)
             policy = deepcopy(self.policy)
-            for _ in range(n_policies):
+            for iteration_number in range(n_policies):
+                print("Before iteration ", iteration_number + 1, " size of policy: ", len(self.policy))
                 self.reinitialize()
                 self.nrpa(level - 1, n_policies)
                 score = self.get_score()
@@ -158,9 +212,18 @@ class PathGenerator(object):
         """
         best_trajectory = None
         best_score = self.best_score
-        self.states_values[tuple(self.current_position)]["unvisited_children"] = list(
-            discrete_possible_moves(self.current_position, self.current_map).values()
-        )
+        if self.strategy == "mcts":
+            self.states_values[tuple(self.current_position)]["unvisited_children"] = (
+                list(
+                    discrete_possible_moves(
+                        self.current_position, self.current_map
+                    ).values()
+                )
+            )
+        elif self.strategy in ["rave", "grave"]:
+            self.states_values[tuple(self.current_position)]["unvisited_children"] = (
+                discrete_possible_moves(self.current_position, self.current_map)
+            )
         # print(len(self.states_values[tuple(self.current_position)]["unvisited_children"]))
         for iteration_number in range(n_iterations):
             self.reinitialize()
@@ -178,22 +241,41 @@ class PathGenerator(object):
                 == 0
             ) and not self.is_finished():
                 self.states_values[tuple(self.current_position)]["n_visits"] += 1
-                new_cell = discrete_selection(
-                    self.current_position,
-                    [
-                        child
-                        for child in self.states_values[tuple(self.current_position)][
-                            "children"
-                        ]
-                        if child not in visited_states
-                    ],
-                    self.states_values,
-                )
+                if self.strategy == "mcts":
+                    new_cell = discrete_selection(
+                        self.current_position,
+                        [
+                            child
+                            for child in self.states_values[
+                                tuple(self.current_position)
+                            ]["children"]
+                            if child not in visited_states
+                        ],
+                        self.states_values,
+                    )
+                    normalized_angle = None
+                elif self.strategy == "rave":
+                    normalized_angle, new_cell = discrete_rave_selection(
+                        self.current_position,
+                        {
+                            angle: child
+                            for angle, child in self.states_values[
+                                tuple(self.current_position)
+                            ]["children"].items()
+                            if child not in visited_states
+                        },
+                        self.states_values,
+                        self.actions_values,
+                    )
+                elif self.strategy == "grave":
+                    pass
+                else:
+                    raise ValueError("Strategy in discrete MCTS ill-defined")
                 if new_cell is None:
                     no_cell_found = True
                     break
                 # print("Before update: ", new_cell, " vs ", self.current_position)
-                self.update(None, new_cell)
+                self.update(normalized_angle, new_cell)
                 assert (
                     new_cell not in visited_states
                 ), "Selected state was already visited: " + str(new_cell)
@@ -211,19 +293,35 @@ class PathGenerator(object):
             expansion = False
             if not self.is_finished():
                 # print("Expanding for iteration ", iteration_number + 1)
-                new_cell = discrete_expansion(self.current_position, self.states_values)
+                if self.strategy == "mcts":
+                    normalized_angle, new_cell = None, discrete_expansion(
+                        self.current_position, self.states_values
+                    )
+                    self.states_values[tuple(self.current_position)]["children"].append(
+                        new_cell
+                    )
+                    # print(new_cell, " vs ", self.current_position)
+                    self.states_values[tuple(self.current_position)][
+                        "unvisited_children"
+                    ].remove(new_cell)
+                elif self.strategy in ["rave", "grave"]:
+                    normalized_angle, new_cell = discrete_rave_expansion(
+                        self.current_position, self.states_values
+                    )
+                    self.states_values[tuple(self.current_position)]["children"][
+                        normalized_angle
+                    ] = new_cell
+                    # print(new_cell, " vs ", self.current_position)
+                    self.states_values[tuple(self.current_position)][
+                        "unvisited_children"
+                    ].pop(normalized_angle)
+                else:
+                    raise ValueError("Strategy in discrete MCTS ill-defined")
+
                 visited_states.add(tuple(new_cell))
                 if len(visited_states) == self.trajectory_size:
                     print(visited_states)
-
                 ## Add cell to visited states and remove it from unvisited ones wrt current position
-                self.states_values[tuple(self.current_position)]["children"].append(
-                    new_cell
-                )
-                # print(new_cell, " vs ", self.current_position)
-                self.states_values[tuple(self.current_position)][
-                    "unvisited_children"
-                ].remove(new_cell)
 
                 if new_cell in self.states_values.keys():
                     self.states_values[tuple(new_cell)]["n_visits"] += 1
@@ -233,33 +331,55 @@ class PathGenerator(object):
                         "n_visits": 1,
                         "cumulative_score": 0,
                         "mean_score": 0,
-                        "children": list(),
-                        "unvisited_children": list(
-                            set(
-                                list(
-                                    discrete_possible_moves(
-                                        new_cell, self.current_map
-                                    ).values()
+                    }
+                    if self.strategy == "mcts":
+                        self.states_values[tuple(new_cell)]["children"] = list()
+                        self.states_values[tuple(new_cell)]["unvisited_children"] = (
+                            list(
+                                set(
+                                    list(
+                                        discrete_possible_moves(
+                                            new_cell, self.current_map
+                                        ).values()
+                                    )
                                 )
                             )
-                        ),
-                    }
+                        )
+
+                    elif self.strategy in ["rave", "grave"]:
+                        self.states_values[tuple(new_cell)]["children"] = dict()
+                        self.states_values[tuple(new_cell)]["unvisited_children"] = (
+                            discrete_possible_moves(new_cell, self.current_map)
+                        )
+                    else:
+                        raise ValueError("Strategy in discrete MCTS ill-defined")
+
                 # print(self.states_values[tuple(new_cell)]["unvisited_children"])
-                self.update(None, new_cell)
+                self.update(normalized_angle, new_cell)
                 expansion = True
 
             # Simulation
             simulation_length = 0
             while not self.is_finished():
-                new_cell = discrete_random_simulation(
-                    self.current_position, self.current_map
-                )
-                self.update(None, new_cell)
+                if self.strategy == "mcts":
+                    new_cell = discrete_random_simulation(
+                        self.current_position, self.current_map
+                    )
+                    normalized_angle = None
+                elif self.strategy in ["rave", "grave"]:
+                    normalized_angle, new_cell = discrete_rave_simulation(
+                        self.current_position, self.current_map, self.actions_values
+                    )
+                else:
+                    raise ValueError("Strategy in discrete MCTS ill-defined")
+                self.update(normalized_angle, new_cell)
                 simulation_length += 1
 
             # Backpropagation
             score = self.get_score()
             backpropagation(self.trajectory, self.states_values, score)
+            if self.strategy in ["rave", "grave"]:
+                rave_backpropagation(self.actions, self.actions_values, score)
 
             if (iteration_number + 1) % 100 == 0:
                 print("At iteration ", iteration_number + 1)
@@ -273,7 +393,7 @@ class PathGenerator(object):
             if score < best_score:
                 best_trajectory = self.trajectory[:]
                 best_score = score
-                # print("New best score found at iteration", iteration_number + 1 ,": ", best_score)
+                print("New best score found at iteration", iteration_number + 1 ,": ", best_score)
 
         self.best_score = best_score
         self.trajectory = best_trajectory
@@ -361,13 +481,6 @@ class PathGenerator(object):
         self.best_score = best_score
         self.trajectory = best_trajectory
 
-    def generate_path(self):
-
-        self.trajectory = [self.start_point]
-        while not self.is_finished():
-            angle, new_cell = self.step()
-            self.update(angle, new_cell)
-
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]
         passage_points = list()
@@ -380,6 +493,16 @@ class PathGenerator(object):
             frames.append(get_map(self.current_map, passage_points, self.goal))
 
         return frames
+
+    def get_trajectory_frame(self):
+        passage_points = list()
+        for cell_number, cell in enumerate(self.trajectory[:-1]):
+            passage_points.extend(
+                get_intermediary_passage_points(
+                    cell, self.trajectory[cell_number + 1], self.current_map
+                )
+            )
+        return get_map(self.current_map, passage_points, self.goal)
 
     def get_score(self):
         return len(self.trajectory) + np.linalg.norm(

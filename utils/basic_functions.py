@@ -30,3 +30,4 @@ def gaussian_kernel(sigma, radius=None):  # ChatGPT
     kernel = np.exp(-(x**2) / (2 * sigma**2))
     kernel /= kernel.sum()
     return kernel
+

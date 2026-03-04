@@ -22,8 +22,8 @@ def compute_uct(position: tuple, new_position: tuple, states_values: dict) -> fl
 def discrete_possible_moves(position: tuple, current_map: np.ndarray) -> dict:
     height, width = current_map.shape
     candidate_positions = [cell_selector(position, angle) for angle in DISCRETE_ACTIONS]
-    return {
-        round(DISCRETE_ACTIONS[cell_id], 3): cell
+    actions_states_dict = {
+        DISCRETE_ACTIONS[cell_id]: cell
         for cell_id, cell in enumerate(candidate_positions)
         if (cell[0] >= 0)
         and (cell[1] >= 0)
@@ -31,6 +31,7 @@ def discrete_possible_moves(position: tuple, current_map: np.ndarray) -> dict:
         and (cell[1] < width)
         and (current_map[*cell] != 1)
     }
+    return actions_states_dict
 
 
 def discrete_random_simulation(position: tuple, current_map: np.ndarray) -> tuple:
@@ -50,7 +51,7 @@ def discrete_selection(
         return None
 
 
-def discrete_expansion(position: tuple, states_values: dict):
+def discrete_expansion(position: tuple, states_values: dict) -> tuple:
     """
     Only callable when states_values[position]["unvisited_children"] is non-empty
     """

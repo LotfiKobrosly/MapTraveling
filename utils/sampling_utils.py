@@ -1,7 +1,11 @@
 import numpy as np
 from scipy.stats import multivariate_normal
+from sklearn.linear_model import LinearRegression, ridge_regression
+from sklearn.neural_network import MLPRegressor
 from sklearn.mixture import GaussianMixture
-from utils.constants import LEARNING_RATE, EPSILON
+from xgboost import XGBRegressor
+
+from utils.constants import LEARNING_RATE, EPSILON, MLP_PARAMETERS
 
 
 def conditional_gaussian_1d(mu, Sigma, x_fixed):  # ChatGPT
@@ -91,3 +95,13 @@ def update_covariance(
     # Numerical stability
     covariance += epsilon * np.eye(3)
     return covariance
+
+def get_model(sampling_method: str = "LinearRegression"):
+    if sampling_method == "RidgeRegression":
+        return ridge_regression()
+    elif sampling_method == "NeuralNetwork":
+        return MLPRegressor(**MLP_PARAMETERS)
+    elif sampling_method == "xgboost":
+        return XGBRegressor()
+    else:
+        return LinearRegression()

@@ -1,2 +1,5 @@
 # Map Traveling
 This repo contains a simplified map traveling structure with a randomly generated map with obstacles, as start point and a goal. The objective is to implement a continuous version of *Nested Rollout Policy Adaptation (NRPA)* and its variations. Then we would like to compare the performance to that of a *Rapid Action Value Evaluation (RAVE)* and its generalized version *GRAVE*.
+
+# Continous NRPA
+For the continuous version of NRPA and its derivatives, according to ChatGPT, a GaussianMixture model is best when we want to sample conditionally (in the simulation step). However, it is not very compatible with refitting after each ieration (very slow). It suggests using a linear regression model (hence, also Ridge and Lasso), or a small neural network, that is why we are adding the `sampling_method` input for the `PathGenerator` class to select which method to use when running NRPA-based algorithms.
