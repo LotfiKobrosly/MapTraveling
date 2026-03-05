@@ -5,6 +5,10 @@ def code_action(angle: float):
     return round(angle, 3)
 
 
+def code_position(position: tuple):
+    return (round(position[0], 3), round(position[1], 3))
+
+
 def code_state(position: list):
     return (code_action(position[0]), code_action(position[1]))
 

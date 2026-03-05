@@ -35,11 +35,74 @@ def compute_beta(parent_pamaf_value: float, child_pamaf_value: float) -> float:
     )
 
 
-def discrete_rave_selection(
+def compute_continuous_amaf(normalized_angle, new_cell, states_values, kernel=None):
+    """
+    We compute the AMAF value using a gaussian convolution as mentioned in :
+    Romain Michelucci, Denis Pallez, Tristan Cazenave, Jean-Paul Comet. Improving continuous Monte
+    Carlo Tree Search for Identifying Parameters in Hybrid Gene Regulatory Networks. Parallel Problem
+    Solving From Nature, Sep 2024, Hagenberg Castle, Austria. pp.319-334, ff10.1007/978-3-031-70085-
+    9_20ff. ffhal-04557914f
+    """
+    amaf_value = 0
+    amaf_signal = list()
+    angle = 2 * np.pi * normalized_angle
+    for position, values in states_values.items():
+        state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
+        if state_distance < RELEVANCE_RADIUS:
+            if state_distance == 0:
+                amaf_signal.append(0)
+            else:
+                for action in states_values[position]["children"].keys():
+                    action_angle = 2 * np.pi * action
+                    amaf_signal.append(
+                        np.log(
+                            state_distance**2 / STATE_DISTANCE_PARAMETER
+                            + (angle - action_angle) ** 2
+                            / ACTION_DISTANCE_PARAMETER
+                        )
+                        * states_values[position]["mean_score"]
+                    )
+    if amaf_signal:
+        if kernel is None:
+            kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
+        amaf_value = np.convolve(amaf_signal, kernel, mode="same").sum()
+    return amaf_value
+
+
+def compute_continuous_pamaf(
+    normalized_angle, new_cell, states_values, kernel=None
+) -> float:
+    pamaf_value = 0
+    pamaf_signal = list()
+    angle = 2 * np.pi * normalized_angle
+    for position, values in states_values.items():
+        state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
+        if state_distance < RELEVANCE_RADIUS:
+            if state_distance == 0:
+                pamaf_signal.append(0)
+            else:
+                for action in states_values[position]["children"].keys():
+                    action_angle = 2 * np.pi * action
+                    pamaf_signal.append(
+                        np.log(
+                            state_distance**2 / STATE_DISTANCE_PARAMETER
+                            + (angle - action_angle) ** 2
+                            / ACTION_DISTANCE_PARAMETER
+                        )
+                    )
+    if pamaf_signal:
+        if kernel is None:
+            kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
+        pamaf_value = np.convolve(pamaf_signal, kernel, mode="same").sum()
+    return pamaf_value
+
+
+def rave_selection(
     position: tuple,
     candidate_actions_positions: dict,
     states_values: dict,
     actions_values: dict,
+    continuous: bool = False,
     grave: bool = False,
     n_visits_reference: int = N_VISITS_REFERENCE,
     reference_position: tuple = None,
@@ -47,19 +110,36 @@ def discrete_rave_selection(
     chosen_angle = None
     best_blended_value = -np.inf
     for angle, state in candidate_actions_positions.items():
-        uct_value = compute_uct(position, state, states_values)
-        amaf_value = get_discrete_amaf(position, angle, actions_values)
         if grave:
             if states_values[tuple(position)]["n_visits"] > n_visits_reference:
                 reference_position = position
         else:
             reference_position = position
+        uct_value = compute_uct(position, state, states_values)
+        if continuous:
+            amaf_value = compute_continuous_amaf(angle, state, states_values)
+            pamaf_value = compute_continuous_pamaf(angle, state, states_values)
+            reference_pamaf_value = compute_continuous_pamaf(
+                angle, reference_position, states_values
+            )
+            #print("AMAF: ", amaf_value)
+            #print("pAMAF: ", pamaf_value)
+            #print("Reference pAMAF: ", reference_pamaf_value)
+        else:
+            amaf_value = get_discrete_amaf(position, angle, actions_values)
+            pamaf_value = states_values[tuple(state)]["n_visits"]
+            reference_pamaf_value = get_discrete_pamaf(
+                reference_position, angle, actions_values
+            )
         beta = compute_beta(
-            get_discrete_pamaf(reference_position, angle, actions_values),
-            states_values[tuple(state)]["n_visits"],
+            reference_pamaf_value,
+            pamaf_value,
         )
-        if ((1 - beta) * uct_value + beta * amaf_value) > best_blended_value:
+        blended_value = ((1 - beta) * uct_value + beta * amaf_value)
+        #print(blended_value)
+        if  blended_value > best_blended_value:
             chosen_angle = angle
+            best_blended_value = blended_value
 
     return chosen_angle, candidate_actions_positions.get(chosen_angle, None)
 
@@ -87,118 +167,3 @@ def rave_backpropagation(actions_list: list, actions_values: dict, score: float)
         for action in actions_values[position].keys():
             if action in actions_list:
                 actions_values[position][action]["cumulative_score"] -= score
-
-
-def compute_continuous_amaf(position, new_position, states_values, kernel=None):
-    """
-    We compute the AMAF value using a gaussian convolution as mentioned in :
-    Romain Michelucci, Denis Pallez, Tristan Cazenave, Jean-Paul Comet. Improving continuous Monte
-    Carlo Tree Search for Identifying Parameters in Hybrid Gene Regulatory Networks. Parallel Problem
-    Solving From Nature, Sep 2024, Hagenberg Castle, Austria. pp.319-334, ff10.1007/978-3-031-70085-
-    9_20ff. ffhal-04557914f
-    """
-    amaf_value = 0
-    amaf_signal = list()
-    for key, value in states_values.items():
-        state_distance = np.linalg.norm(np.array(position) - np.array(list(key)))
-        if state_distance < RELEVANCE_RADIUS:
-            amaf_signal.append(
-                np.log(
-                    state_distance**2 / STATE_DISTANCE_PARAMETER
-                    + cosine_similarity(
-                        np.array(new_position) - np.array(position),
-                        np.array(key) - np.array(position),
-                    )
-                    ** 2
-                    / ACTION_DISTANCE_PARAMETER
-                )
-                * states_values[key]["mean_score"]
-            )
-    if amaf_signal:
-        if kernel is None:
-            kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
-        amaf_value = np.convolve(amaf_signal, kernel, mode="same").sum()
-    return amaf_value
-
-
-def compute_continuous_pamaf(
-    position, new_position, states_values, kernel=None
-) -> float:
-    pamaf_value = 0
-    pamaf_signal = list()
-    for key, value in states_values.items():
-        state_distance = np.linalg.norm(np.array(position) - np.array(list(key)))
-        if state_distance < RELEVANCE_RADIUS:
-            pamaf_signal.append(
-                np.log(
-                    state_distance**2 / STATE_DISTANCE_PARAMETER
-                    + cosine_similarity(
-                        np.array(new_position) - np.array(position),
-                        np.array(key) - np.array(position),
-                    )
-                    ** 2
-                    / ACTION_DISTANCE_PARAMETER
-                )
-            )
-    if pamaf_signal:
-        if kernel is None:
-            kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
-        pamaf_value = np.convolve(pamaf_signal, kernel, mode="same").sum()
-    return pamaf_value
-
-
-def compute_rave_uct(
-    current_position: list,
-    candidate_position: list,
-    states_values: dict,
-    is_continuous: bool = False,
-) -> float:
-    if is_continuous:
-        amaf_value = compute_continuous_amaf(
-            current_position, candidate_position, states_values
-        )
-        pamaf_value = compute_continuous_pamaf(
-            current_position, candidate_position, states_values
-        )
-
-    else:
-        amaf_value = compute_discrete_amaf(
-            current_position, candidate_position, states_values
-        )
-        pamaf_value = compute_discrete_pamaf(
-            current_position, candidate_position, states_values
-        )
-    beta = compute_beta(states_values[tuple(current_position)]["n_visits"], pamaf_value)
-    return (1 - beta) * states_values[tuple(candidate_position)][
-        "mean_score"
-    ] + beta * amaf_value
-
-
-def compute_grave_uct(
-    current_position: list,
-    candidate_position: list,
-    reference_position: list,
-    states_values: dict,
-    is_continuous: bool = False,
-) -> float:
-    if is_continuous:
-        amaf_value = compute_continuous_amaf(
-            reference_position, candidate_position, states_values
-        )
-        pamaf_value = compute_continuous_pamaf(
-            reference_position, candidate_position, states_values
-        )
-
-    else:
-        amaf_value = compute_discrete_amaf(
-            reference_position, candidate_position, states_values
-        )
-        pamaf_value = compute_discrete_pamaf(
-            reference_position, candidate_position, states_values
-        )
-    beta = compute_beta(
-        states_values[tuple(reference_position)]["n_visits"], pamaf_value
-    )
-    return (1 - beta) * states_values[tuple(candidate_position)][
-        "mean_score"
-    ] + beta * amaf_value

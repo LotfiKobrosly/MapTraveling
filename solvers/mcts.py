@@ -1,7 +1,12 @@
 import random
 import numpy as np
 
-from utils.map_utils import cell_selector, get_intermediary_passage_points
+from utils.map_utils import (
+    cell_selector,
+    continuous_cell_selector,
+    cell_is_reachable,
+    get_intermediary_passage_points,
+)
 from utils.constants import (
     EXPLORATION_CONSTANT,
     RANDOM_STATE,
@@ -34,13 +39,7 @@ def discrete_possible_moves(position: tuple, current_map: np.ndarray) -> dict:
     return actions_states_dict
 
 
-def discrete_random_simulation(position: tuple, current_map: np.ndarray) -> tuple:
-    return random.choice(list(discrete_possible_moves(position, current_map).values()))
-
-
-def discrete_selection(
-    position: tuple, candidate_positions: list, states_values: dict
-) -> tuple:
+def selection(position: tuple, candidate_positions: list, states_values: dict) -> tuple:
     uct_values = [
         compute_uct(position, child, states_values) for child in candidate_positions
     ]
@@ -60,30 +59,26 @@ def discrete_expansion(position: tuple, states_values: dict) -> tuple:
     )
 
 
+def discrete_random_simulation(position: tuple, current_map: np.ndarray) -> tuple:
+    return random.choice(list(discrete_possible_moves(position, current_map).values()))
+
+
 def continuous_random_simulation(position: tuple, current_map: np.ndarray) -> tuple:
-    height, width = current_map.shape
-    next_cell_found = False
-    while not next_cell_found:
+    new_cell = (-1, -1)
+    while not cell_is_reachable(new_cell, current_map):
         angle = RANDOM_STATE.uniform(0, 1)
-        new_cell = cell_selector(position, angle * 2 * np.pi)
-        if (
-            (new_cell[0] >= 0)
-            and (new_cell[0] < height)
-            and (new_cell[1] >= 0)
-            and (new_cell[1] < width)
-            and (current_map[new_cell[0], new_cell[1]] != 1)
-        ):
-            next_cell_found = True
-            intermediary_passage_points = get_intermediary_passage_points(
-                position, new_cell, current_map
-            )
-            for point in intermediary_passage_points:
-                if current_map[point[0], point[1]] == 1:
-                    next_cell_found = False
-                    break
-            if not next_cell_found:
-                continue
-            break
+        new_cell = continuous_cell_selector(position, angle)
+
+    return angle, new_cell
+
+
+def continuous_expansion(
+    position: tuple, states_values: dict, current_map: np.ndarray
+) -> tuple:
+    angle, new_cell = continuous_random_simulation(position, current_map)
+    while new_cell in states_values[tuple(position)]["children"]:
+        angle, new_cell = continuous_random_simulation(position, current_map)
+
     return angle, new_cell
 
 
