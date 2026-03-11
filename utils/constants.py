@@ -24,23 +24,24 @@ ALGORITHMS = [
 # Gaussian Mixture
 N_GMM_COMPONENTS = 10
 EPSILON = 1e-6
-RELEVANCE_RADIUS = 10
+RELEVANCE_RADIUS = 5
 
 # NRPA, GNRPA, ABGNRPA
-LEARNING_RATE = 0.1
-GAMMA = 0.01
+LEARNING_RATE = 1e-1
+GAMMA = 1e-4
 TAU = 10
 N_SAMPLES_TO_CHOOSE_FROM = 20
 SAMPLING_METHODS = [
-    "GaussianMixture",
+    "KNeighborsRegressor",
     "LinearRegression",
-    "RidgeRegrression",
+    "RidgeRegression",
     "MLP",
     "XGBoost",
+    "KernelRidge",
 ]
 MLP_SHAPE = (100,)
 MLP_LOSS = "squared_error"
-MLP_ACTIVATION = "relu"
+MLP_ACTIVATION = "tanh"
 MLP_SOLVER = "adam"
 MLP_LEARNING_RATE = 0.001
 MLP_PARAMETERS = {
@@ -51,6 +52,7 @@ MLP_PARAMETERS = {
     "activation": MLP_ACTIVATION,
     "solver": MLP_SOLVER,
 }
+N_EPOCHS = 10
 
 # Gaussian convolution
 STATE_DISTANCE_PARAMETER = 50

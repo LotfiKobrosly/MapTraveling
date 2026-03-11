@@ -156,7 +156,6 @@ def adapt_policy_gnrpa(
     best_trajectory, best_course_of_actions, policy, score_change, sampling_method
 ):
     for point_index, point in enumerate(best_trajectory[:-1]):
-        i, j = point[0], point[1]
         if policy:
             restricted_policy = {
                 key: value
@@ -174,8 +173,8 @@ def adapt_policy_gnrpa(
                         np.array(key),
                         np.array(
                             [
-                                i,
-                                j,
+                                point[0],
+                                point[1],
                                 code_action(best_course_of_actions[point_index]),
                             ]
                         ),
@@ -184,12 +183,12 @@ def adapt_policy_gnrpa(
                     restricted_policy[key] = policy[key]
                 if (
                     policy.get(
-                        (i, j, code_action(best_course_of_actions[point_index])),
+                        (*code_position(point[:2]), code_action(best_course_of_actions[point_index])),
                         None,
                     )
                     is None
                 ):
-                    policy[(i, j, code_action(best_course_of_actions[point_index]))] = (
+                    policy[(*code_position(point[2:]), code_action(best_course_of_actions[point_index]))] = (
                         average_covariance * 9 / 10
                     )
 
@@ -208,8 +207,8 @@ def adapt_policy_gnrpa(
                     )
                     # print(variation)
                     policy[position] += variation
-                if (i, j) not in policy.keys():
-                    policy[(i, j)] = best_course_of_actions[point_index]
+                if code_position(point) not in policy.keys():
+                    policy[code_position(point)] = best_course_of_actions[point_index]
 
         else:
             if sampling_method == "GaussianMixture":
@@ -219,9 +218,9 @@ def adapt_policy_gnrpa(
                         for _ in range(3)
                     ]
                 ).reshape((3, 3))
-                policy[(i, j, code_action(best_course_of_actions[point_index]))] = (
+                policy[(*code_position(point[:2]), code_action(best_course_of_actions[point_index]))] = (
                     random_matrix @ random_matrix.T
                 )
             else:
-                policy[(i, j)] = best_course_of_actions[point_index]
+                policy[code_position(point)] = best_course_of_actions[point_index]
     return policy
