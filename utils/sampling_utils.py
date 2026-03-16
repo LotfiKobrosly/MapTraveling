@@ -9,25 +9,25 @@ from xgboost import XGBRegressor
 
 from utils.constants import LEARNING_RATE, EPSILON, MLP_PARAMETERS
 
-class GaussianKernel2D: #ChatGPT
+class GaussianKernel: #ChatGPT
     def __init__(self, center, sigma):
         """
-        center: array-like of shape (2,) -> mean of the Gaussian
+        center: array-like -> mean of the Gaussian
         sigma: float -> standard deviation (same for both dimensions)
         """
-        self.mu = np.asarray(center, dtype=float)
+        self.mu = np.array(center, dtype=float)
         self.sigma = float(sigma)
-        self.dim = 2
+        self.dim = np.shape(self.mu)[0]
         
         # Precompute constants
-        self.norm_const = 1.0 / ((2 * np.pi * self.sigma**2) ** (self.dim / 2))
+        self.norm_const = 1 / ((2 * np.pi * self.sigma) ** (self.dim / 2))
 
     def pdf(self, x):
         """
         Compute probability density at point x.
         x: array-like of shape (2,)
         """
-        x = np.asarray(x, dtype=float)
+        x = np.array(x, dtype=float)
         diff = x - self.mu
         exponent = -0.5 * np.dot(diff, diff) / (self.sigma**2)
         return self.norm_const * np.exp(exponent)

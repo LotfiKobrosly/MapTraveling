@@ -24,32 +24,35 @@ def nrpa_step(
     position,
     current_map,
     policy,
-    model,
-    sampling_radius=RELEVANCE_RADIUS / 4,
+    sampling_radius=0.001,
+    relevance_radius_list=[RELEVANCE_RADIUS],
 ):
-    if len(policy) > 0:
+    if len(policy) > 1:
 
         # Unbiased estimator
         #mean = model.predict(np.array(list(position)).reshape(1, -1))[0]
         if position in policy.keys():
             mean = policy[position]
         else:
-            gaussian_filter = GaussianKernel2D(position, sigma=RELEVANCE_RADIUS)
             coefficients = np.zeros((len(policy)))
             angles = np.zeros((len(policy)))
-            for counter, (key, value) in enumerate(policy.items()):
-                coefficients[counter] = gaussian_filter.pdf(key)
-                angles[counter] = value
+            radius_index = 0
+            while np.sum(coefficients) < 0.5 and radius_index < len(relevance_radius_list):
+                gaussian_filter = GaussianKernel(position, sigma=relevance_radius_list[radius_index])
+                for counter, (key, value) in enumerate(policy.items()):
+                    coefficients[counter] = gaussian_filter.pdf(key)
+                    angles[counter] = value
+                radius_index += 1
             coefficients /= np.sum(coefficients)
             mean = angles @ coefficients.T
         new_cell = [-1, -1]
-        widening = 1 # to prevent the search of being stuck
+        widening = 0.01 # to prevent the search of being stuck
         while not cell_is_reachable(new_cell, current_map):
             normalized_angle = RANDOM_STATE.normal(mean, sampling_radius + widening, size=1)[0]
             widening += 0.01
             if int(widening / 0.01) % 100 == 0:
                 print("Mean ", mean)
-                print("Sigma: ", sampling_radius * widening_factor)
+                print("Sigma: ", sampling_radius + widening_factor)
                 print("Reached ", int(widening / 0.01), " iterations of widening")
             new_cell = continuous_cell_selector(position, normalized_angle)
 
@@ -60,24 +63,27 @@ def nrpa_step(
             new_cell = continuous_cell_selector(position, normalized_angle)
     return normalized_angle
 
-#def fit_nrpa_model():
-
 
 def adapt_policy_nrpa(
-    best_trajectory, best_course_of_actions, policy, model, score_change, learning_rate, sampling_method, n_epochs=1
+    best_trajectory, best_course_of_actions, policy, score_change, learning_rate, sampling_method, relevance_radius_list
 ):
     if len(policy) > 0:
         cumulative_change = 0
         for position, previous_angle in policy.items():
-            gaussian_filter = GaussianKernel2D(position, sigma=3)
             coefficients, values = list(), list()
-            for point_index, point in enumerate(best_trajectory[:-1]):
-                if np.linalg.norm(np.array(list(position)) - np.array(list(point))) <= RELEVANCE_RADIUS:
-                    coefficients.append(gaussian_filter.pdf(point))
-                    values.append(best_course_of_actions[point_index])
-            if coefficients:
-                coefficients = np.array(coefficients)
-                new_angle = (coefficients / np.sum(coefficients)) @ np.array(values).T
+            radius_index = 0
+            while len(coefficients) == 0 and radius_index < len(relevance_radius_list):
+                gaussian_filter = GaussianKernel(position, sigma=relevance_radius_list[radius_index])
+                for point_index, point in enumerate(best_trajectory[:-1]):
+                    if np.linalg.norm(np.array(list(position)) - np.array(list(point))) <= relevance_radius_list[radius_index]:
+                        coefficients.append(gaussian_filter.pdf(point))
+                        values.append(best_course_of_actions[point_index])
+                if coefficients:
+                    coefficients = np.array(coefficients)
+                    coefficients /= np.sum(coefficients)
+                    assert not np.isnan(coefficients).any(), "NaN value found in coefficients computingq"
+                    new_angle = coefficients @ np.array(values).T
+                radius_index += 1
 
             else:
                 new_angle = previous_angle
@@ -110,18 +116,4 @@ def adapt_policy_nrpa(
         if value > 1 or value < 0:
             raise ValueError("Angle outisde of [0, 1]: " + str(value))
 
-    """
-    # Refitting the model
-    x_data = np.zeros((len(policy), 2))
-    y_data = np.zeros((len(policy)))
-    for counter, (key, value) in enumerate(policy.items()):
-        x_data[counter, :] = np.array(list(key)).reshape((1, 2))
-        y_data[counter] = value
-
-    #scaler = StandardScaler()
-    #x_data = scaler.fit_transform(x_data)
-    #for _ in range(n_epochs):
-    #model.fit(x_data, y_data)
-    """
-
-    return policy, model, cumulative_change
+    return policy

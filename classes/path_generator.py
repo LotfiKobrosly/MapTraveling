@@ -36,6 +36,8 @@ class PathGenerator(object):
         self.trajectory = [self.start_point]
         self.actions = list()
         height, width = current_map.shape
+        max_radius = int(np.sqrt(height ** 2 + width ** 2))
+        self.relevance_levels = np.arange(1, max_radius, 10)
         self.best_score = height * width
         self.score_normalizer = height * width
         if strategy in ["nrpa", "gnrpa", "abgnrpa"]:
@@ -102,9 +104,9 @@ class PathGenerator(object):
 
     def step(self):
         self.current_position = code_position(self.current_position)
-        sampling_radius = np.exp(- self.nrpa_iterations / self.n_policies)
-        if self.cumulative_change / max(1, len(self.trajectory)) < 1e-2:
-            sampling_radius = 1
+        sampling_radius = np.exp(- self.nrpa_iterations / (self.n_policies / HALF_LIFE_DIVIDER))
+        #if self.cumulative_change / max(1, len(self.trajectory)) < 1e-2:
+        #    sampling_radius = 1
         #if sampling_radius == 1 or sampling_radius < 0.1:
         #    print(sampling_radius)
         if self.strategy == "random_walk":
@@ -116,8 +118,8 @@ class PathGenerator(object):
                 self.current_position,
                 self.current_map,
                 self.policy,
-                self.model,
                 sampling_radius=sampling_radius,
+                relevance_radius_list=self.relevance_levels,
             )
 
         elif self.strategy == "gnrpa":
@@ -127,8 +129,8 @@ class PathGenerator(object):
                 self.goal,
                 self.current_map,
                 policy,
-                self.model,
                 sampling_radius=sampling_radius,
+                relevance_radius_list=self.relevance_levels,
             )
 
         elif self.strategy == "abgnrpa":
@@ -139,8 +141,8 @@ class PathGenerator(object):
                 self.policy,
                 self.heuristic_values,
                 1 - self.get_score() / self.score_normalizer,
-                self.model,
                 sampling_radius=sampling_radius,
+                relevance_radius_list=self.relevance_levels,
             )
 
         else:
@@ -166,28 +168,27 @@ class PathGenerator(object):
             self.update(angle, new_cell)
 
     def adapt_policy(
-        self, best_trajectory, best_course_of_actions, policy, model, score_difference, learning_rate
+        self, best_trajectory, best_course_of_actions, policy, score_difference, learning_rate
     ):
         if self.strategy == "nrpa":
             return adapt_policy_nrpa(
                 best_trajectory,
                 best_course_of_actions,
                 policy,
-                model,
                 score_difference,
                 learning_rate,
                 self.sampling_method,
-                1 + int(N_EPOCHS * self.nrpa_iterations / self.n_policies),
+                relevance_radius_list=self.relevance_levels,
             )
         elif self.strategy in ["gnrpa", "abgnrpa"]:
             return adapt_policy_gnrpa(
                 best_trajectory,
                 best_course_of_actions,
                 policy,
-                model,
                 score_difference,
                 learning_rate,
                 self.sampling_method,
+                relevance_radius_list=self.relevance_levels,
             )
         else:
             raise ValueError("Wrong strategy for policy adaptation")
@@ -213,8 +214,6 @@ class PathGenerator(object):
             learning_rate = LEARNING_RATE
             self.cumulative_change = 100
             for iteration_number in range(n_policies):
-                #if (iteration_number + 1) % 50 == 0:
-                #    print(
                 #        "Before iteration ",
                 #        iteration_number + 1,
                 #        " size of policy: ",
@@ -234,24 +233,24 @@ class PathGenerator(object):
                     trajectory_evolution.append(self.get_trajectory_frame())
                     print("Better score found at iteration ", iteration_number + 1, ": ", int(best_score))
                 #print("Score difference: ", np.absolute(best_score - score) / self.score_normalizer)
-                self.policy, self.model, self.cumulative_change = self.adapt_policy(
+                self.policy = self.adapt_policy(
                     best_trajectory,
                     best_course_of_actions,
                     self.policy,
-                    self.model,
                     np.absolute(best_score - score) / self.score_normalizer,
                     learning_rate,
                 )
                 score = self.get_score()
+                if (iteration_number + 1) % 100 == 0:
+                    print("Iteration n° ", iteration_number + 1, " done")
                 #learning_rate = np.sqrt(learning_rate)
                 score_evolution.append(score)
                 #print("Angle at start : ", self.policy[code_position(self.start_point)])
             self.nrpa_iterations = iteration_number + 1
-            policy, model = self.adapt_policy(
+            policy = self.adapt_policy(
                 best_trajectory,
                 best_course_of_actions,
                 policy=policy,
-                model=model,
                 score_difference=np.absolute(last_best_score - best_score) / self.score_normalizer,
                 learning_rate=learning_rate,
             )

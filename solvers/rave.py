@@ -35,26 +35,25 @@ def compute_beta(parent_pamaf_value: float, child_pamaf_value: float) -> float:
     )
 
 
-def compute_continuous_amaf(normalized_angle, new_cell, states_values, kernel=None):
+def compute_continuous_amaf(normalized_angle, new_cell, states_values, relevance_levels, kernel=None):
     """
-    We compute the AMAF value using a gaussian convolution as mentioned in :
+    We compute the AMAF value using a modified version of a gaussian convolution as mentioned in:
     Romain Michelucci, Denis Pallez, Tristan Cazenave, Jean-Paul Comet. Improving continuous Monte
     Carlo Tree Search for Identifying Parameters in Hybrid Gene Regulatory Networks. Parallel Problem
     Solving From Nature, Sep 2024, Hagenberg Castle, Austria. pp.319-334, ff10.1007/978-3-031-70085-
     9_20ff. ffhal-04557914f
     """
     amaf_value = 0
-    amaf_signal = list()
+    amaf_components = list()
     angle = 2 * np.pi * normalized_angle
-    for position, values in states_values.items():
-        state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
-        if state_distance < RELEVANCE_RADIUS:
-            if state_distance == 0:
-                amaf_signal.append(0)
-            else:
+    radius_index = 0
+    while len(amaf_components) == 0 and radius_index < len(relevance_levels):
+        for position, values in states_values.items():
+            state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
+            if state_distance < relevance_levels[radius_index]:
                 for action in states_values[position]["children"].keys():
                     action_angle = 2 * np.pi * action
-                    amaf_signal.append(
+                    amaf_components.append(
                         np.log(
                             state_distance**2 / STATE_DISTANCE_PARAMETER
                             + (angle - action_angle) ** 2
@@ -62,10 +61,10 @@ def compute_continuous_amaf(normalized_angle, new_cell, states_values, kernel=No
                         )
                         * states_values[position]["mean_score"]
                     )
-    if amaf_signal:
+    if amaf_components:
         if kernel is None:
             kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
-        amaf_value = np.convolve(amaf_signal, kernel, mode="same").sum()
+        amaf_value = np.convolve(amaf_components, kernel, mode="same").sum()
     return amaf_value
 
 
@@ -73,27 +72,27 @@ def compute_continuous_pamaf(
     normalized_angle, new_cell, states_values, kernel=None
 ) -> float:
     pamaf_value = 0
-    pamaf_signal = list()
+    pamaf_components = list()
     angle = 2 * np.pi * normalized_angle
     for position, values in states_values.items():
         state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
         if state_distance < RELEVANCE_RADIUS:
             if state_distance == 0:
-                pamaf_signal.append(0)
+                pamaf_components.append(0)
             else:
                 for action in states_values[position]["children"].keys():
                     action_angle = 2 * np.pi * action
-                    pamaf_signal.append(
+                    pamaf_components.append(
                         np.log(
                             state_distance**2 / STATE_DISTANCE_PARAMETER
                             + (angle - action_angle) ** 2
                             / ACTION_DISTANCE_PARAMETER
                         )
                     )
-    if pamaf_signal:
+    if pamaf_components:
         if kernel is None:
             kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
-        pamaf_value = np.convolve(pamaf_signal, kernel, mode="same").sum()
+        pamaf_value = np.convolve(pamaf_components, kernel, mode="same").sum()
     return pamaf_value
 
 
