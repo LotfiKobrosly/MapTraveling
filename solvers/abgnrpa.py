@@ -59,19 +59,15 @@ def abgnrpa_step(
             widening = 0.01  # to prevent the search of being stuck
             gaussian_filter = GaussianKernel([mean], sigma=sampling_radius)
             while not cell_is_reachable(new_cell, current_map):
-                move = RANDOM_STATE.normal(
-                    mean, sampling_radius + widening, size=2
-                )
-                gaussian_filter = GaussianKernel(
-                    mean, sigma=sampling_radius + widening
-                )
+                move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
+                gaussian_filter = GaussianKernel(mean, sigma=sampling_radius + widening)
                 widening += 0.01
                 new_cell = continuous_cell_selector(position, move)
             movement_list.append(move)
         weights = np.array([gaussian_filter.pdf(move) for angle in movement_list])
 
     else:
-        
+
         for _ in range(N_SAMPLES_TO_CHOOSE_FROM):
             new_cell = [-1, -1]
             widening = 0.01  # to prevent the search of being stuck
@@ -83,10 +79,7 @@ def abgnrpa_step(
         weights = np.ones(len(movement_list)) / len(movement_list)
     assert not np.isnan(weights).any(), "NaN value found in weights computing"
     biases_values = np.array(
-        [
-            heuristic_values.get(position, goal, move)
-            for move in movement_list
-        ]
+        [heuristic_values.get(position, goal, move) for move in movement_list]
     )
     assert not np.isnan(biases_values).any(), "NaN value found in biases computing"
     biases_values = biases_values / np.sum(np.absolute(biases_values))
@@ -94,12 +87,14 @@ def abgnrpa_step(
     assert not np.isnan(
         probabilities
     ).any(), "NaN value found in probabilities computing"
-    #print(probabilities)
-    #print(movement_list)
+    # print(probabilities)
+    # print(movement_list)
     probabilities /= np.sum(probabilities)
-    chosen_move = movement_list[np.random.choice(
-        list(range(len(movement_list))), size=1, p=probabilities, replace=False
-    )[0]]
+    chosen_move = movement_list[
+        np.random.choice(
+            list(range(len(movement_list))), size=1, p=probabilities, replace=False
+        )[0]
+    ]
     for move in movement_list:
         previous_value = heuristic_values.get(position, goal, move)
         sign = -1 / len(movement_list)

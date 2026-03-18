@@ -33,30 +33,8 @@ RELEVANCE_RADIUS = 100
 LEARNING_RATE = 1
 GAMMA = 1e-4
 TAU = 10
-HALF_LIFE_DIVIDER = 50
+HALF_LIFE_DIVIDER = 40
 N_SAMPLES_TO_CHOOSE_FROM = 10
-SAMPLING_METHODS = [
-    "KNeighborsRegressor",
-    "LinearRegression",
-    "RidgeRegression",
-    "MLP",
-    "XGBoost",
-    "KernelRidge",
-]
-MLP_SHAPE = (100,)
-MLP_LOSS = "squared_error"
-MLP_ACTIVATION = "tanh"
-MLP_SOLVER = "adam"
-MLP_LEARNING_RATE = 0.001
-MLP_PARAMETERS = {
-    "loss": MLP_LOSS,
-    "learning_rate": "constant",
-    "learning_rate_init": MLP_LEARNING_RATE,
-    "hidden_layer_sizes": MLP_SHAPE,
-    "activation": MLP_ACTIVATION,
-    "solver": MLP_SOLVER,
-}
-N_EPOCHS = 10
 
 # Gaussian convolution
 STATE_DISTANCE_PARAMETER = 50

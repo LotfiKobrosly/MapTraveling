@@ -57,19 +57,15 @@ def gnrpa_step(
             widening = 0.01  # to prevent the search of being stuck
             gaussian_filter = GaussianKernel([mean], sigma=sampling_radius)
             while not cell_is_reachable(new_cell, current_map):
-                move = RANDOM_STATE.normal(
-                    mean, sampling_radius + widening, size=2
-                )
-                gaussian_filter = GaussianKernel(
-                    mean, sigma=sampling_radius + widening
-                )
+                move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
+                gaussian_filter = GaussianKernel(mean, sigma=sampling_radius + widening)
                 widening += 0.01
                 new_cell = continuous_cell_selector(position, normalized_angle)
             movement_list.append(move)
         weights = np.array([gaussian_filter.pdf(move) for angle in movement_list])
 
     else:
-        
+
         for _ in range(N_SAMPLES_TO_CHOOSE_FROM):
             new_cell = [-1, -1]
             widening = 0.01  # to prevent the search of being stuck
@@ -81,10 +77,7 @@ def gnrpa_step(
         weights = np.ones(len(movement_list)) / len(movement_list)
     assert not np.isnan(weights).any(), "NaN value found in weights computing"
     biases_values = np.array(
-        [
-            compute_heuristic_value(position, goal, move)
-            for move in movement_list
-        ]
+        [compute_heuristic_value(position, goal, move) for move in movement_list]
     )
     assert not np.isnan(biases_values).any(), "NaN value found in biases computing"
     biases_values = biases_values / np.sum(np.absolute(biases_values))
@@ -93,9 +86,7 @@ def gnrpa_step(
         probabilities
     ).any(), "NaN value found in probabilities computing"
     probabilities /= np.sum(probabilities)
-    return np.random.choice(movement_list, size=1, p=probabilities, replace=False)[
-        0
-    ]
+    return np.random.choice(movement_list, size=1, p=probabilities, replace=False)[0]
 
 
 def adapt_policy_gnrpa(
@@ -109,8 +100,12 @@ def adapt_policy_gnrpa(
         new_move /= np.linalg.norm(new_move)
         if code(point) in policy.keys():
             previous_move = np.array(policy[code(point)])
-            policy[code(point)] = np.array(policy[code(point)]) + learning_rate * (new_move - previous_move)
+            policy[code(point)] = np.array(policy[code(point)]) + learning_rate * (
+                new_move - previous_move
+            )
         else:
             policy[code(point)] = new_move
-        policy[code(point)] = code(policy[code(point)] / np.linalg.norm(np.array(policy[code(point)])))
+        policy[code(point)] = code(
+            policy[code(point)] / np.linalg.norm(np.array(policy[code(point)]))
+        )
     return policy

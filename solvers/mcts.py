@@ -75,11 +75,11 @@ def continuous_random_simulation(position: tuple, current_map: np.ndarray) -> tu
 def continuous_expansion(
     position: tuple, states_values: dict, current_map: np.ndarray
 ) -> tuple:
-    angle, new_cell = continuous_random_simulation(position, current_map)
+    move, new_cell = continuous_random_simulation(position, current_map)
     while new_cell in states_values[tuple(position)]["children"]:
-        angle, new_cell = continuous_random_simulation(position, current_map)
+        move, new_cell = continuous_random_simulation(position, current_map)
 
-    return angle, new_cell
+    return move, new_cell
 
 
 def backpropagation(trajectory: list, states_values: dict, score: float):

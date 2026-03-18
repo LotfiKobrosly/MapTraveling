@@ -53,9 +53,7 @@ def nrpa_step(
         new_cell = [-1, -1]
         widening = 0.01  # to prevent the search from being stuck
         while not cell_is_reachable(new_cell, current_map):
-            move = RANDOM_STATE.normal(
-                mean, sampling_radius + widening, size=2
-            )
+            move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
             widening += 0.01
             if int(widening / 0.01) % 100 == 0:
                 print("Mean ", mean)
@@ -82,10 +80,14 @@ def adapt_policy_nrpa(
         new_move /= np.linalg.norm(new_move)
         if code(point) in policy.keys():
             previous_move = np.array(policy[code(point)])
-            policy[code(point)] = np.array(policy[code(point)]) + learning_rate * (new_move - previous_move)
+            policy[code(point)] = np.array(policy[code(point)]) + learning_rate * (
+                new_move - previous_move
+            )
         else:
             policy[code(point)] = new_move
-        policy[code(point)] = code(policy[code(point)] / np.linalg.norm(np.array(policy[code(point)])))
+        policy[code(point)] = code(
+            policy[code(point)] / np.linalg.norm(np.array(policy[code(point)]))
+        )
     return policy
 
 

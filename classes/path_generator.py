@@ -85,12 +85,9 @@ class PathGenerator(object):
                 self.actions_values = {tuple(start_point): dict()}
 
     def is_finished(self):
-        return (
-            np.linalg.norm(
-                np.array(list(self.current_position)) - np.array(list(self.goal))
-            ) < 0.5
-            or (self.current_steps >= self.trajectory_size)
-        )
+        return np.linalg.norm(
+            np.array(list(self.current_position)) - np.array(list(self.goal))
+        ) < 0.5 or (self.current_steps >= self.trajectory_size)
 
     def reinitialize(self):
         self.current_position = self.start_point
@@ -154,9 +151,7 @@ class PathGenerator(object):
         else:
             raise (ValueError("No valid strategy defined"))
 
-        return code(move), continuous_cell_selector(
-            self.current_position, move
-        )
+        return code(move), continuous_cell_selector(self.current_position, move)
 
     def generate_path(self):
 
@@ -232,7 +227,12 @@ class PathGenerator(object):
                     )
                     score = self.get_score()
                     if (iteration_number + 1) % 100 == 0:
-                        print("Iteration n° ", iteration_number + 1, ": best score: ", best_score)
+                        print(
+                            "Iteration n° ",
+                            iteration_number + 1,
+                            ": best score: ",
+                            best_score,
+                        )
                     score_evolution.append(score)
                 self.nrpa_iterations = iteration_number + 1
                 policy = self.adapt_policy(
@@ -596,9 +596,7 @@ class PathGenerator(object):
                 normalized_angle, new_cell = continuous_expansion(
                     self.current_position, self.states_values, self.current_map
                 )
-                normalized_angle, new_cell = code(
-                    normalized_angle
-                ), code(new_cell)
+                normalized_angle, new_cell = code(normalized_angle), code(new_cell)
                 if tuple(new_cell) in self.states_values.keys():
                     self.states_values[tuple(new_cell)]["n_visits"] += 1
 
