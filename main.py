@@ -14,8 +14,8 @@ from classes.path_generator import PathGenerator
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 if __name__ == "__main__":
-    #strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa", "mcts", "crave", "cgrave"]
-    #strategies = ["random_walk", "mcts", "crave", "cgrave"]
+    # strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa", "mcts", "crave", "cgrave"]
+    # strategies = ["random_walk", "mcts", "crave", "cgrave"]
     strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa"]
     n_obstacles_max = 5
     height_bounds = [100, 300]
@@ -63,22 +63,29 @@ if __name__ == "__main__":
             print("Running", strategy.upper())
             # Running solver
             for run in range(n_runs):
-                print("Run n°: ", run + 1)
-                start_time = time.time()
-                path_generator = PathGenerator(
-                    current_map, start_point, goal, trajectory_max_length, strategy
-                )
-                if strategy == "random_walk":
-                    inputs["n_iterations"] = 10000
-                elif strategy in ["mcts", "crave", "cgrave"]:
-                    inputs["n_iterations"] = 200000
-                else:
-                    inputs["n_iterations"] = 200
-                path_generator.run(inputs)
-                score = path_generator.best_score
-                scores_list.append(score)
-                time_list.append(time.time() - start_time)
-                play_scenario([path_generator.get_trajectory_frame()], strategy_map_directory + "/run_" + str(run), score)
+                try:
+                    print("Run n°: ", run + 1)
+                    start_time = time.time()
+                    path_generator = PathGenerator(
+                        current_map, start_point, goal, trajectory_max_length, strategy
+                    )
+                    if strategy == "random_walk":
+                        inputs["n_iterations"] = 10000
+                    elif strategy in ["mcts", "crave", "cgrave"]:
+                        inputs["n_iterations"] = 20000
+                    else:
+                        inputs["n_iterations"] = 200
+                    path_generator.run(inputs)
+                    score = path_generator.best_score
+                    scores_list.append(score)
+                    time_list.append(time.time() - start_time)
+                    play_scenario(
+                        [path_generator.get_trajectory_frame()],
+                        strategy_map_directory + "/run_" + str(run),
+                        score,
+                    )
+                except KeyboardInterrupt:
+                    continue
             mean_score[map_id, strategy_id] = np.mean(scores_list)
             std_score[map_id, strategy_id] = np.std(scores_list)
             min_score[map_id, strategy_id] = np.min(scores_list)
@@ -87,10 +94,18 @@ if __name__ == "__main__":
 
     writer = pd.ExcelWriter("Aggregated_scores.xlsx", engine="xlsxwriter")
 
-    mean_dataframe = pd.DataFrame(data=mean_score, columns=strategies, index=range(1, n_maps + 1))
-    std_dataframe = pd.DataFrame(data=std_score, columns=strategies, index=range(1, n_maps + 1))
-    min_dataframe = pd.DataFrame(data=min_score, columns=strategies, index=range(1, n_maps + 1))
-    time_dataframe = pd.DataFrame(data=average_time, columns=strategies, index=range(1, n_maps + 1))
+    mean_dataframe = pd.DataFrame(
+        data=mean_score, columns=strategies, index=range(1, n_maps + 1)
+    )
+    std_dataframe = pd.DataFrame(
+        data=std_score, columns=strategies, index=range(1, n_maps + 1)
+    )
+    min_dataframe = pd.DataFrame(
+        data=min_score, columns=strategies, index=range(1, n_maps + 1)
+    )
+    time_dataframe = pd.DataFrame(
+        data=average_time, columns=strategies, index=range(1, n_maps + 1)
+    )
 
     mean_dataframe.to_excel(writer, sheet_name="Mean score")
     std_dataframe.to_excel(writer, sheet_name="Standard deviation of score")
@@ -98,4 +113,3 @@ if __name__ == "__main__":
     time_dataframe.to_excel(writer, sheet_name="Average time")
 
     writer.close()
-
