@@ -10,7 +10,6 @@ from utils.map_utils import cell_is_reachable, continuous_cell_selector
 from utils.constants import (
     RELEVANCE_RADIUS,
     RANDOM_SEED,
-    TWO_PI,
     RANDOM_STATE,
     EPSILON,
     TAU,
@@ -60,7 +59,7 @@ def gnrpa_step(
                 move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
                 gaussian_filter = GaussianKernel(mean, sigma=sampling_radius + widening)
                 widening += 0.01
-                new_cell = continuous_cell_selector(position, normalized_angle)
+                new_cell = continuous_cell_selector(position, move)
             movement_list.append(move)
         weights = np.array([gaussian_filter.pdf(move) for angle in movement_list])
 
@@ -86,7 +85,11 @@ def gnrpa_step(
         probabilities
     ).any(), "NaN value found in probabilities computing"
     probabilities /= np.sum(probabilities)
-    return np.random.choice(movement_list, size=1, p=probabilities, replace=False)[0]
+    return movement_list[
+        np.random.choice(
+            list(range(len(movement_list))), size=1, p=probabilities, replace=False
+        )[0]
+    ]
 
 
 def adapt_policy_gnrpa(

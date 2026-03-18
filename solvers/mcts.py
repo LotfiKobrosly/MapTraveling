@@ -66,7 +66,7 @@ def discrete_random_simulation(position: tuple, current_map: np.ndarray) -> tupl
 def continuous_random_simulation(position: tuple, current_map: np.ndarray) -> tuple:
     new_cell = (-1, -1)
     while not cell_is_reachable(new_cell, current_map):
-        move = RANDOM_STATE.uniform(0, 1, size=2)
+        move = RANDOM_STATE.uniform(-1, 1, size=2)
         new_cell = continuous_cell_selector(position, move)
 
     return move, new_cell

@@ -40,7 +40,6 @@ class PathGenerator(object):
         while radius < max_radius:
             radius *= 2
             self.relevance_levels.append(radius)
-        print("List of abstraction levels: ", self.relevance_levels)
         self.best_score = height * width
         self.score_normalizer = height * width
         if strategy in ["nrpa", "gnrpa", "abgnrpa"]:
@@ -110,9 +109,10 @@ class PathGenerator(object):
 
     def step(self):
         self.current_position = code(self.current_position)
-        sampling_radius = np.exp(
-            -self.nrpa_iterations / (self.n_policies * HALF_LIFE_DIVIDER)
-        )  # * np.sqrt(self.current_steps / self.trajectory_size)
+        if self.strategy in ["nrpa", "gnrpa", "abgnrpa"]:
+            sampling_radius = np.exp(
+                -self.nrpa_iterations / (self.n_policies * HALF_LIFE_DIVIDER)
+            )  # * np.sqrt(self.current_steps / self.trajectory_size)
         if self.strategy == "random_walk":
             height, width = self.current_map.shape
             return continuous_random_simulation(self.current_position, self.current_map)
@@ -195,73 +195,56 @@ class PathGenerator(object):
             return score_evolution, list()
 
         else:
-            try:
-                iteration_number = self.nrpa_iterations
-                best_score = self.best_score
-                last_best_score = best_score
-                best_trajectory = deepcopy(self.trajectory)
-                best_course_of_actions = deepcopy(self.actions)
-                policy = deepcopy(self.policy)
-                learning_rate = np.sqrt(1 / self.trajectory_size)
-                self.cumulative_change = 100
-                for iteration_number in range(n_policies):
-                    score_list, trajectory_list = self.nrpa(level - 1, n_policies)
-                    score_evolution.extend(score_list)
-                    trajectory_evolution.extend(trajectory_list)
-                    score = self.get_score()
-                    if score < best_score:
-                        best_score, score = score, best_score
-                        best_trajectory = deepcopy(self.trajectory)
-                        best_course_of_actions = deepcopy(self.actions)
-                        trajectory_evolution.append(self.get_trajectory_frame())
-                        print(
-                            "Better score found at iteration ",
-                            iteration_number + 1,
-                            ": ",
-                            int(best_score),
-                        )
-                    self.policy = self.adapt_policy(
-                        best_trajectory,
-                        self.policy,
-                        learning_rate,
+            iteration_number = self.nrpa_iterations
+            best_score = self.best_score
+            last_best_score = best_score
+            best_trajectory = deepcopy(self.trajectory)
+            best_course_of_actions = deepcopy(self.actions)
+            policy = deepcopy(self.policy)
+            learning_rate = np.sqrt(1 / self.trajectory_size)
+            self.cumulative_change = 100
+            for iteration_number in range(n_policies):
+                score_list, trajectory_list = self.nrpa(level - 1, n_policies)
+                score_evolution.extend(score_list)
+                trajectory_evolution.extend(trajectory_list)
+                score = self.get_score()
+                if score < best_score:
+                    best_score, score = score, best_score
+                    best_trajectory = deepcopy(self.trajectory)
+                    best_course_of_actions = deepcopy(self.actions)
+                    trajectory_evolution.append(self.get_trajectory_frame())
+                    print(
+                        "Better score found at iteration ",
+                        iteration_number + 1,
+                        ": ",
+                        int(best_score),
                     )
-                    score = self.get_score()
-                    if (iteration_number + 1) % 100 == 0:
-                        print(
-                            "Iteration n° ",
-                            iteration_number + 1,
-                            ": best score: ",
-                            best_score,
-                        )
-                    score_evolution.append(score)
-                self.nrpa_iterations = iteration_number + 1
-                policy = self.adapt_policy(
+                self.policy = self.adapt_policy(
                     best_trajectory,
-                    policy=policy,
-                    learning_rate=learning_rate,
+                    self.policy,
+                    learning_rate,
                 )
-                self.policy = deepcopy(policy)
-                self.trajectory = deepcopy(best_trajectory)
-                self.best_score = best_score
+                score = self.get_score()
+                if (iteration_number + 1) % 100 == 0:
+                    print(
+                        "Iteration n° ",
+                        iteration_number + 1,
+                        ": best score: ",
+                        best_score,
+                    )
+                score_evolution.append(score)
+            self.nrpa_iterations = iteration_number + 1
+            policy = self.adapt_policy(
+                best_trajectory,
+                policy=policy,
+                learning_rate=learning_rate,
+            )
+            self.policy = deepcopy(policy)
+            self.trajectory = deepcopy(best_trajectory)
+            self.best_score = best_score
 
-                # Plotting score_evolution
-                return score_evolution, trajectory_evolution
-            except KeyboardInterrupt:
-                figure = plt.figure()
-                timer = figure.canvas.new_timer(interval=5000)
-                timer.add_callback(plt.close)
-                timer.start()
-                plt.plot(score_evolution)
-                plt.show()
-                figure.savefig(self.strategy.upper() + "_score_evolution.jpeg")
-                plt.close()
-                # print(self.policy.keys())
-                play_scenario(
-                    trajectory_evolution,
-                    self.strategy.upper(),
-                    min(score_evolution),
-                    wait_time=1,
-                )
+            # Plotting score_evolution
+            return score_evolution, trajectory_evolution
 
     def mcts(self, n_iterations: int = 10000):
         """
@@ -716,10 +699,10 @@ class PathGenerator(object):
         if self.strategy == "random_walk":
             trajectories, scores = list(), list()
             for _ in range(inputs["n_iterations"]):
+                self.reinitialize()
                 self.generate_path()
                 trajectories.append(self.trajectory[:])
                 scores.append(self.get_score())
-                self.reinitialize()
             best_score_index = np.argmin(scores)
             self.trajectory = trajectories[best_score_index]
             self.best_score = scores[best_score_index]

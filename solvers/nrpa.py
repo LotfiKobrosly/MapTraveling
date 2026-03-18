@@ -12,11 +12,8 @@ from utils.map_utils import cell_is_reachable, continuous_cell_selector
 from utils.constants import (
     RELEVANCE_RADIUS,
     RANDOM_SEED,
-    TWO_PI,
     RANDOM_STATE,
     LEARNING_RATE,
-    EPSILON,
-    N_EPOCHS,
 )
 
 
