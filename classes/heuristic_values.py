@@ -7,17 +7,17 @@ class HeuristicValues(object):
         self.bias_factor = bias_factor
         self.values = dict()
 
-    def get_key(self, position, angle):
-        return (position[0], position[1], code_action(angle))
+    def get_key(self, position, move):
+        return code(position) + code(move)
 
-    def get(self, position, goal, angle):
-        key = self.get_key(position, angle)
+    def get(self, position, goal, move):
+        key = self.get_key(position, move)
         if self.values.get(key, None) is None:
             self.values[key] = self.bias_factor * compute_heuristic_value(
-                position, goal, angle
+                position, goal, move
             )
         return self.values[key]
 
-    def set(self, position, angle, value):
-        key = self.get_key(position, angle)
+    def set(self, position, move, value):
+        key = self.get_key(position, move)
         self.values[key] = self.bias_factor * value

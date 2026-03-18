@@ -7,6 +7,9 @@ RANDOM_STATE = np.random.default_rng(seed=RANDOM_SEED)
 # Movement scale
 STEP_SIZE = 2
 
+# MATH
+TWO_PI = 2 * np.pi
+
 # Algorithms
 ALGORITHMS = [
     "random_walk",
@@ -27,10 +30,10 @@ EPSILON = 1e-6
 RELEVANCE_RADIUS = 100
 
 # NRPA, GNRPA, ABGNRPA
-LEARNING_RATE = 1e-1
+LEARNING_RATE = 1
 GAMMA = 1e-4
 TAU = 10
-HALF_LIFE_DIVIDER = 20
+HALF_LIFE_DIVIDER = 50
 N_SAMPLES_TO_CHOOSE_FROM = 10
 SAMPLING_METHODS = [
     "KNeighborsRegressor",

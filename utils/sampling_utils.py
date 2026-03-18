@@ -9,7 +9,8 @@ from xgboost import XGBRegressor
 
 from utils.constants import LEARNING_RATE, EPSILON, MLP_PARAMETERS
 
-class GaussianKernel: #ChatGPT
+
+class GaussianKernel:  # ChatGPT
     def __init__(self, center, sigma):
         """
         center: array-like -> mean of the Gaussian
@@ -18,7 +19,7 @@ class GaussianKernel: #ChatGPT
         self.mu = np.array(center, dtype=float)
         self.sigma = float(sigma)
         self.dim = np.shape(self.mu)[0]
-        
+
         # Precompute constants
         self.norm_const = 1 / ((2 * np.pi * self.sigma) ** (self.dim / 2))
 
@@ -31,6 +32,7 @@ class GaussianKernel: #ChatGPT
         diff = x - self.mu
         exponent = -0.5 * np.dot(diff, diff) / (self.sigma**2)
         return self.norm_const * np.exp(exponent)
+
 
 def conditional_gaussian_1d(mu, Sigma, x_fixed):  # ChatGPT
     """
@@ -116,7 +118,9 @@ def update_covariance(
     nan_before = False
     if np.isnan(covariance).any():
         nan_before = True
-    covariance_change = learning_rate * score * gradient_log_covariance(sample, center, covariance)
+    covariance_change = (
+        learning_rate * score * gradient_log_covariance(sample, center, covariance)
+    )
     covariance += covariance_change
 
     # Symmetrize
@@ -153,4 +157,3 @@ def get_model(sampling_method: str = "LinearRegression"):
             return KNeighborsRegressor(weights="distance")
         case _:
             return LinearRegression()
-

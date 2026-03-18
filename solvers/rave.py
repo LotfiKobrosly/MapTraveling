@@ -9,6 +9,7 @@ from utils.constants import (
     BIAS_VALUE,
     DISCRETE_ACTIONS,
     N_VISITS_REFERENCE,
+    TWO_PI,
 )
 from solvers.mcts import discrete_possible_moves, compute_uct
 
@@ -35,7 +36,9 @@ def compute_beta(parent_pamaf_value: float, child_pamaf_value: float) -> float:
     )
 
 
-def compute_continuous_amaf(normalized_angle, new_cell, states_values, relevance_levels, kernel=None):
+def compute_continuous_amaf(
+    normalized_angle, new_cell, states_values, relevance_levels, kernel=None
+):
     """
     We compute the AMAF value using a modified version of a gaussian convolution as mentioned in:
     Romain Michelucci, Denis Pallez, Tristan Cazenave, Jean-Paul Comet. Improving continuous Monte
@@ -45,19 +48,20 @@ def compute_continuous_amaf(normalized_angle, new_cell, states_values, relevance
     """
     amaf_value = 0
     amaf_components = list()
-    angle = 2 * np.pi * normalized_angle
+    angle = TWO_PI * normalized_angle
     radius_index = 0
     while len(amaf_components) == 0 and radius_index < len(relevance_levels):
         for position, values in states_values.items():
-            state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
+            state_distance = np.linalg.norm(
+                np.array(position) - np.array(list(new_cell))
+            )
             if state_distance < relevance_levels[radius_index]:
                 for action in states_values[position]["children"].keys():
-                    action_angle = 2 * np.pi * action
+                    action_angle = TWO_PI * action
                     amaf_components.append(
                         np.log(
                             state_distance**2 / STATE_DISTANCE_PARAMETER
-                            + (angle - action_angle) ** 2
-                            / ACTION_DISTANCE_PARAMETER
+                            + (angle - action_angle) ** 2 / ACTION_DISTANCE_PARAMETER
                         )
                         * states_values[position]["mean_score"]
                     )
@@ -73,7 +77,7 @@ def compute_continuous_pamaf(
 ) -> float:
     pamaf_value = 0
     pamaf_components = list()
-    angle = 2 * np.pi * normalized_angle
+    angle = TWO_PI * normalized_angle
     for position, values in states_values.items():
         state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
         if state_distance < RELEVANCE_RADIUS:
@@ -81,12 +85,11 @@ def compute_continuous_pamaf(
                 pamaf_components.append(0)
             else:
                 for action in states_values[position]["children"].keys():
-                    action_angle = 2 * np.pi * action
+                    action_angle = TWO_PI * action
                     pamaf_components.append(
                         np.log(
                             state_distance**2 / STATE_DISTANCE_PARAMETER
-                            + (angle - action_angle) ** 2
-                            / ACTION_DISTANCE_PARAMETER
+                            + (angle - action_angle) ** 2 / ACTION_DISTANCE_PARAMETER
                         )
                     )
     if pamaf_components:
@@ -121,9 +124,9 @@ def rave_selection(
             reference_pamaf_value = compute_continuous_pamaf(
                 angle, reference_position, states_values
             )
-            #print("AMAF: ", amaf_value)
-            #print("pAMAF: ", pamaf_value)
-            #print("Reference pAMAF: ", reference_pamaf_value)
+            # print("AMAF: ", amaf_value)
+            # print("pAMAF: ", pamaf_value)
+            # print("Reference pAMAF: ", reference_pamaf_value)
         else:
             amaf_value = get_discrete_amaf(position, angle, actions_values)
             pamaf_value = states_values[tuple(state)]["n_visits"]
@@ -134,9 +137,9 @@ def rave_selection(
             reference_pamaf_value,
             pamaf_value,
         )
-        blended_value = ((1 - beta) * uct_value + beta * amaf_value)
-        #print(blended_value)
-        if  blended_value > best_blended_value:
+        blended_value = (1 - beta) * uct_value + beta * amaf_value
+        # print(blended_value)
+        if blended_value > best_blended_value:
             chosen_angle = angle
             best_blended_value = blended_value
 
