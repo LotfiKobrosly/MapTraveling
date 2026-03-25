@@ -24,8 +24,7 @@ ALGORITHMS = [
     "abgnrpa",
 ]
 
-# Gaussian Mixture
-N_GMM_COMPONENTS = 10
+# Sampling
 EPSILON = 1e-6
 RELEVANCE_RADIUS = 100
 
@@ -46,8 +45,14 @@ N_DISCRETE_ACTIONS = 20
 DISCRETE_ACTIONS = [
     round(action, 3) for action in np.arange(0, 1, 1 / N_DISCRETE_ACTIONS)
 ]
+DISCRETE_MOVEMENTS = [
+    [np.cos(angle * TWO_PI), np.sin(angle * TWO_PI)] for angle in DISCRETE_ACTIONS
+]
 
 # cMCTS and cRAVE/ cGRAVE parameters
 PROGRESSIVE_WIDENING_PARAMETER = 0.05
 BIAS_VALUE = 1e-6
 N_VISITS_REFERENCE = 50
+
+# cNMCTS
+BANDWIDTH = 40

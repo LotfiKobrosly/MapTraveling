@@ -49,7 +49,7 @@ def nrpa_step(
             mean = np.array(coefficients @ movements)
         new_cell = [-1, -1]
         widening = 0.01  # to prevent the search from being stuck
-        while not cell_is_reachable(new_cell, current_map):
+        while not cell_is_reachable(position, new_cell, current_map):
             move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
             widening += 0.01
             if int(widening / 0.01) % 100 == 0:
@@ -60,7 +60,7 @@ def nrpa_step(
 
     else:
         new_cell = [-1, -1]
-        while not cell_is_reachable(new_cell, current_map):
+        while not cell_is_reachable(position, new_cell, current_map):
             move = RANDOM_STATE.uniform(-1, 1, size=2)
             new_cell = continuous_cell_selector(position, move)
     return move

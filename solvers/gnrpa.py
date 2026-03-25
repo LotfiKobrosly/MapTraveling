@@ -55,7 +55,7 @@ def gnrpa_step(
             new_cell = [-1, -1]
             widening = 0.01  # to prevent the search of being stuck
             gaussian_filter = GaussianKernel([mean], sigma=sampling_radius)
-            while not cell_is_reachable(new_cell, current_map):
+            while not cell_is_reachable(position, new_cell, current_map):
                 move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
                 gaussian_filter = GaussianKernel(mean, sigma=sampling_radius + widening)
                 widening += 0.01
@@ -68,7 +68,7 @@ def gnrpa_step(
         for _ in range(N_SAMPLES_TO_CHOOSE_FROM):
             new_cell = [-1, -1]
             widening = 0.01  # to prevent the search of being stuck
-            while not cell_is_reachable(new_cell, current_map):
+            while not cell_is_reachable(position, new_cell, current_map):
                 move = RANDOM_STATE.uniform(-1, 1, size=2)
                 new_cell = continuous_cell_selector(position, move)
             movement_list.append(move)

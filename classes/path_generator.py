@@ -69,7 +69,7 @@ class PathGenerator(object):
                         for angle in DISCRETE_ACTIONS
                     }
                 }
-        if strategy in ["cmcts", "crave", "cgrave"]:
+        elif strategy in ["cmcts", "crave", "cgrave"]:
             self.states_values = {
                 tuple(start_point): {
                     "n_visits": 1,
@@ -82,6 +82,8 @@ class PathGenerator(object):
                 self.reference_state = start_point
                 self.states_values[tuple(start_point)]["children"] = dict()
                 self.actions_values = {tuple(start_point): dict()}
+        elif strategy == "cnmcts":
+            self.states_actions = dict()
 
     def is_finished(self):
         return np.linalg.norm(
@@ -114,7 +116,6 @@ class PathGenerator(object):
                 -self.nrpa_iterations / (self.n_policies * HALF_LIFE_DIVIDER)
             )  # * np.sqrt(self.current_steps / self.trajectory_size)
         if self.strategy == "random_walk":
-            height, width = self.current_map.shape
             return continuous_random_simulation(self.current_position, self.current_map)
 
         elif self.strategy == "nrpa":
@@ -158,9 +159,9 @@ class PathGenerator(object):
         self.trajectory = [self.start_point]
         while not self.is_finished():
             move, new_cell = self.step()
-            assert cell_is_reachable(new_cell, self.current_map), (
-                "Position " + str(new_cell) + " out of bounds OR inside obstacle"
-            )
+            assert cell_is_reachable(
+                self.current_position, new_cell, self.current_map
+            ), ("Position " + str(new_cell) + " out of bounds OR inside obstacle")
             self.update(move, new_cell)
 
     def adapt_policy(
@@ -660,6 +661,69 @@ class PathGenerator(object):
             trajectory_evolution, self.strategy.upper(), best_score, wait_time=1
         )
 
+    def cnmcts(
+        self, original_level: int = 1, current_level: int = 1, bandwidth: int = 50, node_iterations: int = 1
+    ):
+        if current_level == 0:
+            while not self.is_finished():
+                if code(self.current_position) in self.states_actions.keys():
+                    move = random.choice(
+                        self.states_actions[code(self.current_position)]
+                    )
+                    new_cell = continuous_cell_selector(self.current_position, move)
+                else:
+                    move, new_cell = continuous_random_simulation(
+                        self.current_position, self.current_map
+                    )
+                self.update(move, new_cell)
+
+        else:
+            if not self.is_finished():
+                scores_list = list()
+                if not code(self.current_position) in self.states_actions.keys():
+                    self.states_actions[code(self.current_position)] = list()
+                    for _ in range(bandwidth):
+                        new_cell = [-1, -1]
+                        visited_state = False
+                        while not cell_is_reachable(
+                            self.current_position, new_cell, self.current_map
+                        ) or np.any(
+                            [
+                                np.linalg.norm(
+                                    np.array([new_cell] - np.array(cell))
+                                ) < 1
+                                for cell in self.visited_states
+                            ]
+                        ):
+                            move, new_cell = continuous_random_simulation(
+                                self.current_position, self.current_map
+                            )
+                        self.states_actions[code(self.current_position)].append(move)
+                moves_list = self.states_actions[code(self.current_position)]
+                for move_index, move in enumerate(moves_list):
+                    move_scores_list = list()
+                    for _ in range(node_iterations):
+                        path = deepcopy(self)
+                        path.update(move, continuous_cell_selector(path.current_position, move))
+                        move_scores_list.append(
+                            path.cnmcts(original_level, current_level - 1, bandwidth)
+                        )
+                    scores_list.append(np.mean(move_scores_list))
+                best_index = np.argmin(scores_list)
+                best_score = scores_list[best_index]
+                best_move = moves_list[best_index]
+                if current_level == original_level:
+                    new_cell = continuous_cell_selector(self.current_position, move)
+                    self.visited_states.add(new_cell)
+                    self.update(
+                        best_move, continuous_cell_selector(self.current_position, move)
+                    )
+                    return self.cnmcts(original_level, current_level, bandwidth)
+                if best_score < self.best_score:
+                    self.best_score = best_score
+                return best_score 
+        return self.get_score()
+
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]
         passage_points = list()
@@ -712,3 +776,11 @@ class PathGenerator(object):
             self.mcts(n_iterations=inputs["n_iterations"])
         elif self.strategy in ["cmcts", "crave", "cgrave"]:
             self.cmcts(n_iterations=inputs["n_iterations"])
+        elif self.strategy == "cnmcts":
+            self.visited_states = set()
+            self.cnmcts(
+                original_level=inputs["level"],
+                current_level=inputs["level"],
+                bandwidth=inputs["bandwidth"],
+                node_iterations=inputs["n_iterations"],
+            )
