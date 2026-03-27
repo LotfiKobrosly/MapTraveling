@@ -33,6 +33,7 @@ class PathGenerator(object):
         self.current_steps = 0
         self.trajectory = [self.start_point]
         self.actions = list()
+        self.best_course_of_actions = list()
         height, width = current_map.shape
         max_radius = np.sqrt(height**2 + width**2)
         self.relevance_levels = [0.5]
@@ -662,7 +663,7 @@ class PathGenerator(object):
         )
 
     def cnmcts(
-        self, original_level: int = 1, current_level: int = 1, bandwidth: int = 50, node_iterations: int = 1
+        self, original_level: int = 1, current_level: int = 1, bandwidth: int = 50
     ):
         if current_level == 0:
             while not self.is_finished():
@@ -676,24 +677,18 @@ class PathGenerator(object):
                         self.current_position, self.current_map
                     )
                 self.update(move, new_cell)
+            return self.trajectory, self.actions, self.get_score()
 
         else:
             if not self.is_finished():
-                scores_list = list()
+                #scores_list = list()
                 if not code(self.current_position) in self.states_actions.keys():
                     self.states_actions[code(self.current_position)] = list()
                     for _ in range(bandwidth):
                         new_cell = [-1, -1]
-                        visited_state = False
+                        #visited_state = False
                         while not cell_is_reachable(
                             self.current_position, new_cell, self.current_map
-                        ) or np.any(
-                            [
-                                np.linalg.norm(
-                                    np.array([new_cell] - np.array(cell))
-                                ) < 1
-                                for cell in self.visited_states
-                            ]
                         ):
                             move, new_cell = continuous_random_simulation(
                                 self.current_position, self.current_map
@@ -702,27 +697,25 @@ class PathGenerator(object):
                 moves_list = self.states_actions[code(self.current_position)]
                 for move_index, move in enumerate(moves_list):
                     move_scores_list = list()
-                    for _ in range(node_iterations):
-                        path = deepcopy(self)
-                        path.update(move, continuous_cell_selector(path.current_position, move))
-                        move_scores_list.append(
-                            path.cnmcts(original_level, current_level - 1, bandwidth)
-                        )
-                    scores_list.append(np.mean(move_scores_list))
-                best_index = np.argmin(scores_list)
-                best_score = scores_list[best_index]
-                best_move = moves_list[best_index]
+                    #for _ in range(node_iterations):
+                    path = deepcopy(self)
+                    path.update(move, continuous_cell_selector(path.current_position, move))
+                    trajectory, actions_list, score = path.cnmcts(original_level, current_level - 1, bandwidth)
+                    if score < self.best_score:
+                        self.best_trajectory = trajectory[:]
+                        self.best_course_of_actions = actions_list[:]
+                        self.best_score = score
+                    #scores_list.append(np.mean(move_scores_list))
                 if current_level == original_level:
-                    new_cell = continuous_cell_selector(self.current_position, move)
-                    self.visited_states.add(new_cell)
-                    self.update(
-                        best_move, continuous_cell_selector(self.current_position, move)
-                    )
-                    return self.cnmcts(original_level, current_level, bandwidth)
-                if best_score < self.best_score:
-                    self.best_score = best_score
-                return best_score 
-        return self.get_score()
+                    move = self.best_course_of_actions[self.current_steps - 1]
+                    self.update(self.best_course_of_actions[self.current_steps - 1], self.best_trajectory[self.current_steps])
+                    trajectory, actions_list, score = self.cnmcts(original_level, current_level, bandwidth)
+                    if score < self.best_score:
+                        self.best_trajectory = trajectory[:]
+                        self.best_course_of_actions = actions_list[:]
+                        self.best_score = score
+
+        return self.best_trajectory, self.best_course_of_actions, self.best_score
 
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]
@@ -777,10 +770,11 @@ class PathGenerator(object):
         elif self.strategy in ["cmcts", "crave", "cgrave"]:
             self.cmcts(n_iterations=inputs["n_iterations"])
         elif self.strategy == "cnmcts":
-            self.visited_states = set()
-            self.cnmcts(
+            trajectory, actions, score = self.cnmcts(
                 original_level=inputs["level"],
                 current_level=inputs["level"],
                 bandwidth=inputs["bandwidth"],
-                node_iterations=inputs["n_iterations"],
             )
+            self.trajectory = trajectory
+            self.actions = actions
+            self.best_score = score
