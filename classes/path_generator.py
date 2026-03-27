@@ -663,9 +663,9 @@ class PathGenerator(object):
         )
 
     def cnmcts(
-        self, original_level: int = 1, current_level: int = 1, bandwidth: int = 50
+        self, level: int = 1, bandwidth: int = 50
     ):
-        if current_level == 0:
+        if level == 0:
             while not self.is_finished():
                 if code(self.current_position) in self.states_actions.keys():
                     move = random.choice(
@@ -680,13 +680,13 @@ class PathGenerator(object):
             return self.trajectory, self.actions, self.get_score()
 
         else:
-            if not self.is_finished():
-                #scores_list = list()
+            while not self.is_finished():
+                # scores_list = list()
                 if not code(self.current_position) in self.states_actions.keys():
                     self.states_actions[code(self.current_position)] = list()
                     for _ in range(bandwidth):
                         new_cell = [-1, -1]
-                        #visited_state = False
+                        # visited_state = False
                         while not cell_is_reachable(
                             self.current_position, new_cell, self.current_map
                         ):
@@ -697,25 +697,28 @@ class PathGenerator(object):
                 moves_list = self.states_actions[code(self.current_position)]
                 for move_index, move in enumerate(moves_list):
                     move_scores_list = list()
-                    #for _ in range(node_iterations):
+                    # for _ in range(node_iterations):
                     path = deepcopy(self)
-                    path.update(move, continuous_cell_selector(path.current_position, move))
-                    trajectory, actions_list, score = path.cnmcts(original_level, current_level - 1, bandwidth)
+                    path.update(
+                        move, continuous_cell_selector(path.current_position, move)
+                    )
+                    trajectory, actions_list, score = path.cnmcts(
+                        level - 1, bandwidth
+                    )
                     if score < self.best_score:
                         self.best_trajectory = trajectory[:]
                         self.best_course_of_actions = actions_list[:]
                         self.best_score = score
-                    #scores_list.append(np.mean(move_scores_list))
-                if current_level == original_level:
-                    move = self.best_course_of_actions[self.current_steps - 1]
-                    self.update(self.best_course_of_actions[self.current_steps - 1], self.best_trajectory[self.current_steps])
-                    trajectory, actions_list, score = self.cnmcts(original_level, current_level, bandwidth)
-                    if score < self.best_score:
-                        self.best_trajectory = trajectory[:]
-                        self.best_course_of_actions = actions_list[:]
-                        self.best_score = score
+                    # scores_list.append(np.mean(move_scores_list))
+                self.update(
+                    self.best_course_of_actions[self.current_steps - 1],
+                    self.best_trajectory[self.current_steps],
+                )
 
         return self.best_trajectory, self.best_course_of_actions, self.best_score
+
+    def policy_by_region_nrpa(self, level: int, n_policies: int):
+        pass
 
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]
@@ -771,8 +774,7 @@ class PathGenerator(object):
             self.cmcts(n_iterations=inputs["n_iterations"])
         elif self.strategy == "cnmcts":
             trajectory, actions, score = self.cnmcts(
-                original_level=inputs["level"],
-                current_level=inputs["level"],
+                level=inputs["level"],
                 bandwidth=inputs["bandwidth"],
             )
             self.trajectory = trajectory
