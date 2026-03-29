@@ -5,7 +5,7 @@ RANDOM_SEED = 42
 RANDOM_STATE = np.random.default_rng(seed=RANDOM_SEED)
 
 # Movement scale
-STEP_SIZE = 2
+STEP_SIZE = 10
 
 # MATH
 TWO_PI = 2 * np.pi

@@ -87,9 +87,11 @@ class PathGenerator(object):
             self.states_actions = dict()
 
     def is_finished(self):
-        return np.linalg.norm(
-            np.array(list(self.current_position)) - np.array(list(self.goal))
-        ) < 0.5 or (self.current_steps >= self.trajectory_size)
+        return (
+                np.linalg.norm(
+                np.array(list(self.current_position)) - np.array(list(self.goal))
+            ) < 0.5
+        ) or (self.current_steps >= self.trajectory_size)
 
     def reinitialize(self):
         self.current_position = self.start_point
@@ -105,10 +107,10 @@ class PathGenerator(object):
         )
 
     def update(self, move, new_cell):
-        self.current_steps += 1
         self.current_position = code(new_cell)
         self.trajectory.append(code(new_cell))
         self.actions.append(code(move))
+        self.current_steps += 1
 
     def step(self):
         self.current_position = code(self.current_position)
@@ -709,10 +711,15 @@ class PathGenerator(object):
                         self.best_trajectory = trajectory[:]
                         self.best_course_of_actions = actions_list[:]
                         self.best_score = score
-                    # scores_list.append(np.mean(move_scores_list))
+                # TODO: investigate the reason behind the need for the next if clause
+                # It is not supposed to be needed
+                if self.current_steps >= len(self.best_course_of_actions):
+                    self.actions = self.best_course_of_actions[:][:-1]
+                    self.trajectory = self.best_trajectory[:][:-1]
+                    self.current_steps = len(self.best_course_of_actions) - 1
                 self.update(
-                    self.best_course_of_actions[self.current_steps - 1],
-                    self.best_trajectory[self.current_steps],
+                    self.best_course_of_actions[self.current_steps],
+                    self.best_trajectory[self.current_steps + 1],
                 )
 
         return self.best_trajectory, self.best_course_of_actions, self.best_score
