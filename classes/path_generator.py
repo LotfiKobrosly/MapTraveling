@@ -33,6 +33,7 @@ class PathGenerator(object):
         self.current_position = start_point
         self.current_steps = 0
         self.trajectory = [self.start_point]
+        self.best_trajectory = [self.start_point]
         self.actions = list()
         self.best_course_of_actions = list()
         height, width = current_map.shape
@@ -266,7 +267,6 @@ class PathGenerator(object):
 
     def policy_by_region_nrpa(self, level: int, n_policies: int):
         self.n_policies = n_policies
-        trajectory_evolution, score_evolution = list(), list()
         if level == 0:
             sampling_radius = np.exp(
                 -self.nrpa_iterations / (self.n_policies * HALF_LIFE_DIVIDER)
@@ -280,51 +280,51 @@ class PathGenerator(object):
                     sampling_radius,
                 )
                 self.update(move, new_cell)
-            score_evolution.append(self.get_score())
+            score = self.get_score()
+            if score < self.best_score:
+                self.best_score = score
+                self.best_trajectory = self.trajectory[:]
+                self.best_course_of_actions = self.actions[:]
 
         else:
             iteration_number = self.nrpa_iterations
             best_score = self.best_score
-            last_best_score = best_score
-            best_trajectory = deepcopy(self.trajectory)
-            best_course_of_actions = deepcopy(self.actions)
+            best_trajectory = deepcopy(self.best_trajectory)
+            best_course_of_actions = deepcopy(self.best_course_of_actions)
             policy = deepcopy(self.policy)
             learning_rate = np.sqrt(1 / self.trajectory_size)
             self.cumulative_change = 100
             for iteration_number in range(n_policies):
+                #print(self.policy)
                 self.reinitialize()
-                score_list, trajectory_list = self.policy_by_region_nrpa(level - 1, n_policies)
-                score_evolution.extend(score_list)
-                trajectory_evolution.extend(trajectory_list)
-                score = self.get_score()
+                self.policy_by_region_nrpa(level - 1, n_policies)
+                score = self.best_score
                 if score < best_score:
-                    best_score, score = score, best_score
-                    best_trajectory = deepcopy(self.trajectory)
-                    best_course_of_actions = deepcopy(self.actions)
-                    trajectory_evolution.append(self.get_trajectory_frame())
+                    best_score = score
+                    best_trajectory = deepcopy(self.best_trajectory)
+                    best_course_of_actions = deepcopy(self.best_course_of_actions)
                     print(
                         "Better score found at iteration ",
                         iteration_number + 1,
                         ": ",
                         int(best_score),
                     )
-                existing_regions = list(policy.keys())
+                existing_regions = list(self.policy.keys())
                 for bounding_coordinates in existing_regions:
-                    if policy[bounding_coordinates]["n_visits"] > policy[bounding_coordinates]["threshold"]:
+                    if self.policy[bounding_coordinates]["n_visits"] > self.policy[bounding_coordinates]["threshold"]:
                         for new_region in subdivide_region(bounding_coordinates):
-                            policy[new_region] = {
-                                "move": policy[bounding_coordinates]["move"],
-                                "n_visits": policy[bounding_coordinates]["n_visits"],
+                            self.policy[new_region] = {
+                                "move": self.policy[bounding_coordinates]["move"],
+                                "n_visits": self.policy[bounding_coordinates]["n_visits"],
                                 "threshold": int(self.area / get_region_area(new_region))
                             }
-                        del policy[bounding_coordinates]
+                        del self.policy[bounding_coordinates]
                 self.policy = adapt_pbrnrpa_policy(
                     best_trajectory,
                     best_course_of_actions,
                     self.policy,
                     learning_rate,
                 )
-                score = self.get_score()
                 if (iteration_number + 1) % 100 == 0:
                     print(
                         "Iteration n° ",
@@ -332,19 +332,19 @@ class PathGenerator(object):
                         ": best score: ",
                         best_score,
                     )
-                score_evolution.append(score)
             self.nrpa_iterations = iteration_number + 1
-            policy = adapt_pbrnrpa_policy(
-                best_trajectory,
-                best_course_of_actions,
-                policy=policy,
-                learning_rate=learning_rate,
+            self.policy = deepcopy(
+                adapt_pbrnrpa_policy(
+                    best_trajectory,
+                    best_course_of_actions,
+                    policy,
+                    learning_rate,
+                )
             )
-            self.policy = deepcopy(policy)
             self.trajectory = deepcopy(best_trajectory)
             self.best_score = best_score
+            self.best_course_of_actions = deepcopy(best_course_of_actions)
 
-        return score_evolution, trajectory_evolution
 
     def mcts(self, n_iterations: int = 10000):
         """

@@ -31,9 +31,9 @@ def pbrnrpa_step(position: tuple, current_map: np.ndarray, policy: dict, samplin
     while not cell_is_reachable(position, new_cell, current_map):
         move = RANDOM_STATE.normal(mean, sampling_radius + widening, size=2)
         widening += 0.01
-        if int(widening / 0.01) % 100 == 0:
+        if int(widening / 0.01) % 100000 == 0:
             print("Mean ", mean)
-            print("Sigma: ", sampling_radius + widening_factor)
+            print("Sigma: ", sampling_radius + widening)
             print("Reached ", int(widening / 0.01), " iterations of widening")
         new_cell = continuous_cell_selector(position, move)
     return move, new_cell
@@ -56,11 +56,9 @@ def adapt_pbrnrpa_policy(
                 regional_division_of_points[key].append(best_course_of_actions[point_index])
 
     for region in regional_division_of_points.keys():
-        regional_division_of_points[region] = np.mean(list(regional_division_of_points[region]), axis=0)
-
-    # Adapting the assigned moves to each region
-    for region in regional_division_of_points.keys():
-        policy[region]["move"] += learning_rate * (regional_division_of_points[region] - policy[region]["move"])
+        whole_list = list(regional_division_of_points[region])
+        if whole_list:
+            policy[region]["move"] += learning_rate * (np.mean(whole_list, axis=0) - policy[region]["move"])
     
     return policy
     
