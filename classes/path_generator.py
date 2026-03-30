@@ -116,7 +116,7 @@ class PathGenerator(object):
             self.reference_state = self.start_point
 
     def get_score(self):
-        return len(self.trajectory) + np.linalg.norm(
+        return len(self.trajectory) * STEP_SIZE + np.linalg.norm(
             np.array(self.goal) - np.array(self.current_position)
         )
 
