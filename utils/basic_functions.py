@@ -2,6 +2,8 @@ import numpy as np
 
 
 def code(array: tuple):
+    if array is None:
+        return None
     return (round(array[0], 3), round(array[1], 3))
 
 

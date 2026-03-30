@@ -6,6 +6,7 @@ from solvers.gnrpa import *
 from solvers.abgnrpa import *
 from solvers.mcts import *
 from solvers.rave import *
+from solvers.pbrnrpa import *
 from utils.constants import *
 from utils.sampling_utils import *
 from utils.basic_functions import *
@@ -47,7 +48,17 @@ class PathGenerator(object):
             self.policy = dict()
             self.nrpa_iterations = 0
             self.heuristic_values = HeuristicValues(bias_factor)
-        if strategy in ["mcts", "rave", "grave"]:
+        elif strategy == "pbrnrpa":
+            self.policy = {
+                (0, height, 0, width): {
+                    "move": RANDOM_STATE.uniform(-1, 1, size=2),
+                    "n_visits": 0,
+                    "threshold": 1,
+                }
+            }
+            self.area = height * width
+            self.nrpa_iterations = 0
+        elif strategy in ["mcts", "rave", "grave"]:
             self.states_values = {
                 tuple(start_point): {
                     "n_visits": 0,
@@ -85,6 +96,8 @@ class PathGenerator(object):
                 self.actions_values = {tuple(start_point): dict()}
         elif strategy == "cnmcts":
             self.states_actions = dict()
+        else:
+            raise ValueError("Strategy ill-defined")
 
     def is_finished(self):
         return (
@@ -249,6 +262,89 @@ class PathGenerator(object):
 
             # Plotting score_evolution
             return score_evolution, trajectory_evolution
+
+
+    def policy_by_region_nrpa(self, level: int, n_policies: int):
+        self.n_policies = n_policies
+        trajectory_evolution, score_evolution = list(), list()
+        if level == 0:
+            sampling_radius = np.exp(
+                -self.nrpa_iterations / (self.n_policies * HALF_LIFE_DIVIDER)
+            )
+            self.nrpa_iterations += 1
+            while not self.is_finished():
+                move, new_cell = pbrnrpa_step(
+                    self.current_position,
+                    self.current_map,
+                    self.policy,
+                    sampling_radius,
+                )
+                self.update(move, new_cell)
+            score_evolution.append(self.get_score())
+
+        else:
+            iteration_number = self.nrpa_iterations
+            best_score = self.best_score
+            last_best_score = best_score
+            best_trajectory = deepcopy(self.trajectory)
+            best_course_of_actions = deepcopy(self.actions)
+            policy = deepcopy(self.policy)
+            learning_rate = np.sqrt(1 / self.trajectory_size)
+            self.cumulative_change = 100
+            for iteration_number in range(n_policies):
+                self.reinitialize()
+                score_list, trajectory_list = self.policy_by_region_nrpa(level - 1, n_policies)
+                score_evolution.extend(score_list)
+                trajectory_evolution.extend(trajectory_list)
+                score = self.get_score()
+                if score < best_score:
+                    best_score, score = score, best_score
+                    best_trajectory = deepcopy(self.trajectory)
+                    best_course_of_actions = deepcopy(self.actions)
+                    trajectory_evolution.append(self.get_trajectory_frame())
+                    print(
+                        "Better score found at iteration ",
+                        iteration_number + 1,
+                        ": ",
+                        int(best_score),
+                    )
+                existing_regions = list(policy.keys())
+                for bounding_coordinates in existing_regions:
+                    if policy[bounding_coordinates]["n_visits"] > policy[bounding_coordinates]["threshold"]:
+                        for new_region in subdivide_region(bounding_coordinates):
+                            policy[new_region] = {
+                                "move": policy[bounding_coordinates]["move"],
+                                "n_visits": policy[bounding_coordinates]["n_visits"],
+                                "threshold": int(self.area / get_region_area(new_region))
+                            }
+                        del policy[bounding_coordinates]
+                self.policy = adapt_pbrnrpa_policy(
+                    best_trajectory,
+                    best_course_of_actions,
+                    self.policy,
+                    learning_rate,
+                )
+                score = self.get_score()
+                if (iteration_number + 1) % 100 == 0:
+                    print(
+                        "Iteration n° ",
+                        iteration_number + 1,
+                        ": best score: ",
+                        best_score,
+                    )
+                score_evolution.append(score)
+            self.nrpa_iterations = iteration_number + 1
+            policy = adapt_pbrnrpa_policy(
+                best_trajectory,
+                best_course_of_actions,
+                policy=policy,
+                learning_rate=learning_rate,
+            )
+            self.policy = deepcopy(policy)
+            self.trajectory = deepcopy(best_trajectory)
+            self.best_score = best_score
+
+        return score_evolution, trajectory_evolution
 
     def mcts(self, n_iterations: int = 10000):
         """
@@ -511,38 +607,38 @@ class PathGenerator(object):
 
         for iteration_number in range(n_iterations):
             self.reinitialize()
-            visited_states = {tuple(self.current_position)}
+            visited_states = {code(self.current_position)}
             reference_position = self.start_point
 
             # Selection
             selection_length = 0
             no_cell_found = False
             while (not self.is_finished()) and (
-                self.states_values[tuple(self.current_position)]["n_visits"]
+                self.states_values[code(self.current_position)]["n_visits"]
                 ** (PROGRESSIVE_WIDENING_PARAMETER / (selection_length + 1))
-                < len(self.states_values[tuple(self.current_position)]["children"])
+                < len(self.states_values[code(self.current_position)]["children"])
             ):
-                self.states_values[tuple(self.current_position)]["n_visits"] += 1
+                self.states_values[code(self.current_position)]["n_visits"] += 1
                 if self.strategy == "cmcts":
                     new_cell = selection(
                         self.current_position,
                         [
                             child
                             for child in self.states_values[
-                                tuple(self.current_position)
+                                code(self.current_position)
                             ]["children"]
                             if child not in visited_states
                         ],
                         self.states_values,
                     )
-                    normalized_angle = None
+                    chosen_move = None
                 elif self.strategy in ["crave", "cgrave"]:
-                    normalized_angle, new_cell = rave_selection(
+                    chosen_move, new_cell = rave_selection(
                         self.current_position,
                         {
-                            angle: child
-                            for angle, child in self.states_values[
-                                tuple(self.current_position)
+                            move: child
+                            for move, child in self.states_values[
+                                code(self.current_position)
                             ]["children"].items()
                             if child not in visited_states
                         },
@@ -553,7 +649,7 @@ class PathGenerator(object):
                         n_visits_reference=N_VISITS_REFERENCE,
                         reference_position=reference_position,
                     )
-                    normalized_angle = code(normalized_angle)
+                    chosen_move = code(chosen_move)
                 else:
                     raise ValueError("Strategy in discrete MCTS ill-defined")
                 if new_cell is None:
@@ -562,16 +658,16 @@ class PathGenerator(object):
                 # self.actions_values[tuple(self.current_position)][normalized_angle][
                 #    "n_visits"
                 # ] += 1
-                self.update(normalized_angle, new_cell)
+                self.update(chosen_move, new_cell)
                 assert (
                     new_cell not in visited_states
                 ), "Selected state was already visited: " + str(new_cell)
-                visited_states.add(tuple(new_cell))
+                visited_states.add(code(new_cell))
                 selection_length += 1
 
             if no_cell_found:
                 continue
-            self.states_values[tuple(self.current_position)]["n_visits"] += 1
+            self.states_values[code(self.current_position)]["n_visits"] += 1
             selection_length_list.append(selection_length)
             # Stop iterating if all moves are selected
             if selection_length >= self.trajectory_size:
@@ -580,43 +676,43 @@ class PathGenerator(object):
             # Expansion
             expansion = False
             if not self.is_finished():
-                normalized_angle, new_cell = continuous_expansion(
+                move, new_cell = continuous_expansion(
                     self.current_position, self.states_values, self.current_map
                 )
-                normalized_angle, new_cell = code(normalized_angle), code(new_cell)
-                if tuple(new_cell) in self.states_values.keys():
-                    self.states_values[tuple(new_cell)]["n_visits"] += 1
+                move, new_cell = code(move), code(new_cell)
+                if code(new_cell) in self.states_values.keys():
+                    self.states_values[code(new_cell)]["n_visits"] += 1
 
                 else:
-                    self.states_values[tuple(new_cell)] = {
+                    self.states_values[code(new_cell)] = {
                         "n_visits": 1,
                         "cumulative_score": 0,
                         "mean_score": 0,
                         "children": list(),
                     }
                     if self.strategy in ["crave", "cgrave"]:
-                        self.states_values[tuple(new_cell)]["children"] = dict()
+                        self.states_values[code(new_cell)]["children"] = dict()
                 if self.strategy == "cmcts":
-                    self.states_values[tuple(self.current_position)]["children"].append(
+                    self.states_values[code(self.current_position)]["children"].append(
                         new_cell
                     )
                 elif self.strategy in ["crave", "cgrave"]:
-                    self.states_values[tuple(self.current_position)]["children"][
-                        normalized_angle
+                    self.states_values[code(self.current_position)]["children"][
+                        move
                     ] = new_cell
                 else:
                     raise ValueError("Strategy in discrete MCTS ill-defined")
 
-                self.update(normalized_angle, new_cell)
+                self.update(move, new_cell)
                 expansion = True
 
             # Simulation
             simulation_length = 0
             while not self.is_finished():
-                normalized_angle, new_cell = continuous_random_simulation(
+                move, new_cell = continuous_random_simulation(
                     self.current_position, self.current_map
                 )
-                self.update(code(normalized_angle), code(new_cell))
+                self.update(code(move), code(new_cell))
                 simulation_length += 1
 
             score = self.get_score()
@@ -642,7 +738,7 @@ class PathGenerator(object):
                     "\n",
                 )
                 trajectory_evolution.append(self.get_trajectory_frame())
-            score_evolution.append(best_score)
+                score_evolution.append(best_score)
             score_variation.append(score)
 
         self.best_score = score_evolution[-1]
@@ -724,8 +820,6 @@ class PathGenerator(object):
 
         return self.best_trajectory, self.best_course_of_actions, self.best_score
 
-    def policy_by_region_nrpa(self, level: int, n_policies: int):
-        pass
 
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]
@@ -774,7 +868,7 @@ class PathGenerator(object):
             self.trajectory = trajectories[best_score_index]
             self.best_score = scores[best_score_index]
         elif self.strategy in ["nrpa", "gnrpa", "abgnrpa"]:
-            self.nrpa(level=inputs["level"], n_policies=inputs["n_iterations"])
+            self.nrpa(level=inputs["level"], n_policies=inputs["n_policies"])
         elif self.strategy in ["mcts", "rave", "grave"]:
             self.mcts(n_iterations=inputs["n_iterations"])
         elif self.strategy in ["cmcts", "crave", "cgrave"]:
@@ -787,3 +881,7 @@ class PathGenerator(object):
             self.trajectory = trajectory
             self.actions = actions
             self.best_score = score
+        elif self.strategy == "pbrnrpa":
+            self.policy_by_region_nrpa(
+                level=inputs["level"], n_policies=inputs["n_policies"]
+            )

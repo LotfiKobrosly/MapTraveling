@@ -1,6 +1,7 @@
 import random
 import numpy as np
 
+from utils.basic_functions import code
 from utils.map_utils import (
     cell_selector,
     continuous_cell_selector,
@@ -19,7 +20,7 @@ def compute_uct(position: tuple, new_position: tuple, states_values: dict) -> fl
     return states_values[tuple(new_position)][
         "mean_score"
     ] + EXPLORATION_CONSTANT * np.sqrt(
-        np.log(states_values[tuple(position)]["n_visits"])
+        np.log(states_values[code(position)]["n_visits"])
         / states_values[tuple(new_position)]["n_visits"]
     )
 
@@ -55,7 +56,7 @@ def discrete_expansion(position: tuple, states_values: dict) -> tuple:
     Only callable when states_values[position]["unvisited_children"] is non-empty
     """
     return random.choice(
-        states_values[tuple(position)]["unvisited_children"],
+        states_values[code(position)]["unvisited_children"],
     )
 
 
@@ -76,7 +77,7 @@ def continuous_expansion(
     position: tuple, states_values: dict, current_map: np.ndarray
 ) -> tuple:
     move, new_cell = continuous_random_simulation(position, current_map)
-    while new_cell in states_values[tuple(position)]["children"]:
+    while new_cell in states_values[code(position)]["children"]:
         move, new_cell = continuous_random_simulation(position, current_map)
 
     return move, new_cell
@@ -84,9 +85,9 @@ def continuous_expansion(
 
 def backpropagation(trajectory: list, states_values: dict, score: float):
     for position in trajectory:
-        if not states_values.get(tuple(position), None) is None:
-            states_values[tuple(position)]["cumulative_score"] -= score
-            states_values[tuple(position)]["mean_score"] = (
-                states_values[tuple(position)]["cumulative_score"]
-                / states_values[tuple(position)]["n_visits"]
+        if not states_values.get(code(position), None) is None:
+            states_values[code(position)]["cumulative_score"] -= score
+            states_values[code(position)]["mean_score"] = (
+                states_values[code(position)]["cumulative_score"]
+                / states_values[code(position)]["n_visits"]
             )
