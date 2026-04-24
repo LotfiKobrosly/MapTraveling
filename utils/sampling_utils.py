@@ -1,7 +1,5 @@
 import numpy as np
 
-from utils.constants import LEARNING_RATE, EPSILON
-
 
 class GaussianKernel:  # ChatGPT
     def __init__(self, center, sigma):

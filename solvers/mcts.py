@@ -26,17 +26,12 @@ def compute_uct(position: tuple, new_position: tuple, states_values: dict) -> fl
 
 
 def discrete_possible_moves(position: tuple, current_map: np.ndarray) -> dict:
-    height, width = current_map.shape
-    candidate_positions = [cell_selector(position, angle) for angle in DISCRETE_ACTIONS]
-    actions_states_dict = {
-        DISCRETE_ACTIONS[cell_id]: cell
-        for cell_id, cell in enumerate(candidate_positions)
-        if (cell[0] >= 0)
-        and (cell[1] >= 0)
-        and (cell[0] < height)
-        and (cell[1] < width)
-        and (current_map[*cell] != 1)
-    }
+    actions_states_dict = dict()
+    for move in DISCRETE_ACTIONS:
+        cell = cell_selector(position, move)
+        if cell_is_reachable(position, cell, current_map):
+            actions_states_dict[tuple(move)] = cell
+    
     return actions_states_dict
 
 

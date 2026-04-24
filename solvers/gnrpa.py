@@ -85,11 +85,12 @@ def gnrpa_step(
         probabilities
     ).any(), "NaN value found in probabilities computing"
     probabilities /= np.sum(probabilities)
-    return movement_list[
+    move = movement_list[
         np.random.choice(
             list(range(len(movement_list))), size=1, p=probabilities, replace=False
         )[0]
     ]
+    return move, continuous_cell_selector(position, move)
 
 
 def adapt_policy_gnrpa(

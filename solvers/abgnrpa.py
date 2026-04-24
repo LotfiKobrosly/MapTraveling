@@ -101,4 +101,4 @@ def abgnrpa_step(
             sign = 1
         heuristic_values.set(position, move, previous_value + sign * GAMMA * score)
 
-    return chosen_move
+    return chosen_move, continuous_cell_selector(position, chosen_move)

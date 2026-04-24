@@ -9,21 +9,36 @@ from utils.sampling_utils import *
 from utils.constants import *
 from utils.map_random_generator import *
 from utils.map_utils import *
-from classes.path_generator import PathGenerator
+from classes import PathGenerator
+from solvers import run_solver
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 if __name__ == "__main__":
-    # strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa", "mcts", "crave", "cgrave"]
-    # strategies = ["random_walk", "mcts", "crave", "cgrave"]
-    strategies = ["random_walk", "nrpa", "gnrpa", "abgnrpa"]
-    n_obstacles_max = 5
-    height_bounds = [100, 300]
-    width_bounds = [100, 300]
-    trajectory_max_length = 400
+    strategies = {
+        "MCTS": {"strategy": "mcts", "inputs": {"n_iterations": 10000}},
+        "RAVE": {"strategy": "rave", "inputs": {"n_iterations": 10000}},
+        "GRAVE": {"strategy": "grave", "inputs": {"n_iterations": 10000}},
+        "cMCTS": {"strategy": "cmcts", "inputs": {"n_iterations": 10000}},
+        "cRAVE": {"strategy": "crave", "inputs": {"n_iterations": 10000}},
+        "cGRAVE": {"strategy": "cgrave", "inputs": {"n_iterations": 10000}},
+        "cNMCTS_level_1": {"strategy": "cnmcts", "inputs": {"level": 1, "bandwidth": 25}},
+        "cRbNMCTS_level_1": {"strategy": "crbnmcts", "inputs": {"level": 1, "bandwidth": 25}},
+        "cNMCTS_level_2": {"strategy": "cnmcts", "inputs": {"level": 2, "bandwidth": 10}},
+        "cRbNMCTS_level_2": {"strategy": "crbnmcts", "inputs": {"level": 2, "bandwidth": 15}},
+        "cNRPA_level_1": {"strategy": "nrpa", "inputs": {"level": 1, "n_policies": 200}},
+        "cPbRNRPA_level_1": {"strategy": "pbrnrpa", "inputs": {"level": 1, "n_policies": 200}},
+        "cGNRPA_level_1": {"strategy": "gnrpa", "inputs": {"level": 1, "n_policies": 200}},
+        "cABGNRPA_level_1": {"strategy": "abgnrpa", "inputs": {"level": 1, "n_policies": 200}},
+        "cNRPA_level_2": {"strategy": "nrpa", "inputs": {"level": 2, "n_policies": 50}},
+        "cPbRNRPA_level_2": {"strategy": "pbrnrpa", "inputs": {"level": 2, "n_policies": 50}},
+        "cGNRPA_level_2": {"strategy": "gnrpa", "inputs": {"level": 2, "n_policies": 50}},
+        "cABGNRPA_level_2": {"strategy": "abgnrpa", "inputs": {"level": 2, "n_policies": 50}},
+    }
+    n_obstacles_max = 10
+    trajectory_max_length = 100
     n_maps = 10
     n_runs = 10
-    inputs = {"level": 1}
 
     # Figures saving main directory
     figures_directory = "./figures"
@@ -52,30 +67,24 @@ if __name__ == "__main__":
         )
         start_point, goal = generate_start_and_end_points(current_map)
 
-        for strategy_id, strategy in enumerate(strategies):
+        for strategy_id, strategy in enumerate(strategies.keys()):
             # Strategy per map saving directory
-            strategy_map_directory = map_figures_directory + "/" + strategy.upper()
+            strategy_map_directory = map_figures_directory + "/" + strategy
             scores_list = list()
             time_list = list()
             if not os.path.exists(strategy_map_directory):
                 os.mkdir(strategy_map_directory)
 
-            print("Running", strategy.upper())
+            print("Running", strategy)
             # Running solver
             for run in range(n_runs):
                 try:
                     print("Run n°: ", run + 1)
                     start_time = time.time()
                     path_generator = PathGenerator(
-                        current_map, start_point, goal, trajectory_max_length, strategy
+                        current_map, start_point, goal, trajectory_max_length, strategies[strategy]["strategy"]
                     )
-                    if strategy == "random_walk":
-                        inputs["n_iterations"] = 10000
-                    elif strategy in ["mcts", "crave", "cgrave"]:
-                        inputs["n_iterations"] = 20000
-                    else:
-                        inputs["n_iterations"] = 200
-                    path_generator.run(inputs)
+                    run_solver(path_generator, strategies[strategy]["inputs"])
                     score = path_generator.best_score
                     scores_list.append(score)
                     time_list.append(time.time() - start_time)
@@ -90,7 +99,7 @@ if __name__ == "__main__":
             std_score[map_id, strategy_id] = np.std(scores_list)
             min_score[map_id, strategy_id] = np.min(scores_list)
             average_time[map_id, strategy_id] = np.mean(time_list)
-            print(strategy.upper(), " runs done")
+            print(strategy, " runs done")
 
     writer = pd.ExcelWriter("Aggregated_scores.xlsx", engine="xlsxwriter")
 

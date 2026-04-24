@@ -58,7 +58,7 @@ def nrpa_step(
         while not cell_is_reachable(position, new_cell, current_map):
             move = RANDOM_STATE.uniform(-1, 1, size=2)
             new_cell = continuous_cell_selector(position, move)
-    return move
+    return move, new_cell
 
 
 def adapt_policy_nrpa(
