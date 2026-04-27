@@ -1,6 +1,7 @@
 from classes import *
 from solvers.algorithms import *
 
+
 def run_solver(path_generator: PathGenerator, inputs: dict):
     height, width = path_generator.current_map.shape
     if path_generator.strategy == "random_walk":
@@ -41,7 +42,12 @@ def run_solver(path_generator: PathGenerator, inputs: dict):
                 "threshold": 1,
             }
         }
-        nrpa(path_generator, level=inputs["level"], n_policies=inputs["n_policies"], policy=policy)
+        nrpa(
+            path_generator,
+            level=inputs["level"],
+            n_policies=inputs["n_policies"],
+            policy=policy,
+        )
     elif path_generator.strategy in ["mcts", "rave", "grave"]:
         mcts(path_generator, n_iterations=inputs["n_iterations"])
     elif path_generator.strategy in ["cmcts", "crave", "cgrave"]:

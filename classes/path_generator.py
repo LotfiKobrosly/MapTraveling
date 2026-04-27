@@ -102,7 +102,7 @@ class PathGenerator(object):
         self.current_position = code(new_cell)
         self.trajectory.append(code(new_cell))
         self.actions.append(code(move))
-        self.current_steps += 1    
+        self.current_steps += 1
 
     def get_movement_frames(self):
         frames = [get_map(self.current_map, [self.start_point], self.goal)]

@@ -36,9 +36,7 @@ def compute_beta(parent_pamaf_value: float, child_pamaf_value: float) -> float:
     )
 
 
-def compute_continuous_amaf(
-    move, new_cell, states_values, kernel=None
-):
+def compute_continuous_amaf(move, new_cell, states_values, kernel=None):
     """
     We compute the AMAF value using a modified version of a gaussian convolution as mentioned in:
     Romain Michelucci, Denis Pallez, Tristan Cazenave, Jean-Paul Comet. Improving continuous Monte
@@ -49,9 +47,7 @@ def compute_continuous_amaf(
     amaf_value = 0
     amaf_components = list()
     for position, values in states_values.items():
-        state_distance = np.linalg.norm(
-            np.array(position) - np.array(list(new_cell))
-        )
+        state_distance = np.linalg.norm(np.array(position) - np.array(list(new_cell)))
         if state_distance < RELEVANCE_RADIUS:
             if state_distance == 0:
                 amaf_components.append(0)
@@ -60,10 +56,14 @@ def compute_continuous_amaf(
                     amaf_components.append(
                         np.log(
                             state_distance**2 / STATE_DISTANCE_PARAMETER
-                            + np.linalg.norm(np.array(list(action)) - np.array(list(move))) ** 2 / ACTION_DISTANCE_PARAMETER
+                            + np.linalg.norm(
+                                np.array(list(action)) - np.array(list(move))
+                            )
+                            ** 2
+                            / ACTION_DISTANCE_PARAMETER
                         )
                         * states_values[position]["mean_score"]
-                )
+                    )
     if amaf_components:
         if kernel is None:
             kernel = gaussian_kernel(RELEVANCE_RADIUS / 2)
@@ -71,9 +71,7 @@ def compute_continuous_amaf(
     return amaf_value
 
 
-def compute_continuous_pamaf(
-    move, new_cell, states_values, kernel=None
-) -> float:
+def compute_continuous_pamaf(move, new_cell, states_values, kernel=None) -> float:
     pamaf_value = 0
     pamaf_components = list()
     for position, values in states_values.items():
@@ -86,7 +84,11 @@ def compute_continuous_pamaf(
                     pamaf_components.append(
                         np.log(
                             state_distance**2 / STATE_DISTANCE_PARAMETER
-                            + np.linalg.norm(np.array(list(action)) - np.array(list(move))) ** 2 / ACTION_DISTANCE_PARAMETER
+                            + np.linalg.norm(
+                                np.array(list(action)) - np.array(list(move))
+                            )
+                            ** 2
+                            / ACTION_DISTANCE_PARAMETER
                         )
                     )
     if pamaf_components:

@@ -31,7 +31,7 @@ def discrete_possible_moves(position: tuple, current_map: np.ndarray) -> dict:
         cell = cell_selector(position, move)
         if cell_is_reachable(position, cell, current_map):
             actions_states_dict[tuple(move)] = cell
-    
+
     return actions_states_dict
 
 
