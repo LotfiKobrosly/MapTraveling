@@ -9,3 +9,4 @@ export_pythonpath.sh
 *.txt
 anaconda_project*
 *.json
+*figures*
