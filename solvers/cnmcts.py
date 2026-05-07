@@ -1,4 +1,5 @@
 from copy import deepcopy
+import random
 import numpy as np
 
 from classes.path_generator import PathGenerator

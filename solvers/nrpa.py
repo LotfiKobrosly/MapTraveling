@@ -49,7 +49,7 @@ def nrpa_step(
             widening += 0.01
             if int(widening / 0.01) % 100 == 0:
                 print("Mean ", mean)
-                print("Sigma: ", sampling_radius + widening_factor)
+                print("Sigma: ", sampling_radius + widening)
                 print("Reached ", int(widening / 0.01), " iterations of widening")
             new_cell = continuous_cell_selector(position, move)
 
