@@ -1,7 +1,7 @@
-map*
+map/*
 __pycache__*
 .git
-.ipynb_checkpoints*
+*.ipynb*
 scratch_*
 *.jpeg
 export_pythonpath.sh
@@ -10,3 +10,4 @@ export_pythonpath.sh
 anaconda_project*
 *.json
 *figures*
+difficult_map*
