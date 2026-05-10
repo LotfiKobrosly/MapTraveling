@@ -17,12 +17,12 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 if __name__ == "__main__":
     strategies = {
-        "MCTS": {"strategy": "mcts", "inputs": {"n_iterations": 10000}},
-        "RAVE": {"strategy": "rave", "inputs": {"n_iterations": 10000}},
-        "GRAVE": {"strategy": "grave", "inputs": {"n_iterations": 10000}},
-        # "cMCTS": {"strategy": "cmcts", "inputs": {"n_iterations": 10000}},
-        # "cRAVE": {"strategy": "crave", "inputs": {"n_iterations": 10000}},
-        # "cGRAVE": {"strategy": "cgrave", "inputs": {"n_iterations": 10000}},
+        # "MCTS": {"strategy": "mcts", "inputs": {"n_iterations": 10000}},
+        # "RAVE": {"strategy": "rave", "inputs": {"n_iterations": 10000}},
+        # "GRAVE": {"strategy": "grave", "inputs": {"n_iterations": 10000}},
+        "cMCTS": {"strategy": "cmcts", "inputs": {"n_iterations": 10000}},
+        "cRAVE": {"strategy": "crave", "inputs": {"n_iterations": 10000}},
+        "cGRAVE": {"strategy": "cgrave", "inputs": {"n_iterations": 10000}},
         # "cNMCTS_level_1": {
         #     "strategy": "cnmcts",
         #     "inputs": {"level": 1, "bandwidth": 25},
@@ -70,11 +70,11 @@ if __name__ == "__main__":
         # },
     }
     
-    n_obstacles_max = 10
+    # n_obstacles_max = 10
     trajectory_max_length = 100
     maps_file = "./difficult_maps/difficult_maps.json"
-    start_map_id = 0
-    n_maps = 15
+    maps = [5, 10]
+    maps = [13, 14, 15]
     n_runs = 10
 
     # Figures saving main directory
@@ -83,21 +83,21 @@ if __name__ == "__main__":
         os.mkdir(figures_directory)
 
     # Saving scores
-    mean_score = np.zeros((start_map_id + n_maps, len(strategies)))
-    std_score = np.zeros((start_map_id + n_maps, len(strategies)))
-    min_score = np.zeros((start_map_id + n_maps, len(strategies)))
-    average_time = np.zeros((start_map_id + n_maps, len(strategies)))
+    mean_score = np.zeros((len(maps), len(strategies)))
+    std_score = np.zeros((len(maps), len(strategies)))
+    min_score = np.zeros((len(maps), len(strategies)))
+    average_time = np.zeros((len(maps), len(strategies)))
 
-    for map_id in range(start_map_id, start_map_id + n_maps):
-        print("\nMap n°", str(map_id + 1))
+    for counter, map_id in enumerate(maps):
+        print("\nMap n°", str(map_id))
 
         # Figures for map
-        map_figures_directory = figures_directory + "/" + "map_" + str(map_id + 1)
+        map_figures_directory = figures_directory + "/" + "map_" + str(map_id)
         if not os.path.exists(map_figures_directory):
             os.mkdir(map_figures_directory)
 
         # Get the map
-        current_map, start_point, goal = load_raw_map(maps_file, str(map_id + 1))
+        current_map, start_point, goal = load_raw_map(maps_file, str(map_id))
 
         for strategy_id, strategy in enumerate(strategies.keys()):
             # Strategy per map saving directory
@@ -132,25 +132,25 @@ if __name__ == "__main__":
                 except Exception:
                     scores_list.append(np.nan)
                     time_list.append(np.nan)
-            mean_score[map_id, strategy_id] = np.nanmean(scores_list)
-            std_score[map_id, strategy_id] = np.nanstd(scores_list)
-            min_score[map_id, strategy_id] = np.min(scores_list)
-            average_time[map_id, strategy_id] = np.nanmean(time_list)
+            mean_score[counter, strategy_id] = np.nanmean(scores_list)
+            std_score[counter, strategy_id] = np.nanstd(scores_list)
+            min_score[counter, strategy_id] = np.min(scores_list)
+            average_time[counter, strategy_id] = np.nanmean(time_list)
             print(strategy, " runs done")
 
     writer = pd.ExcelWriter("Aggregated_scores_discrete.xlsx", engine="xlsxwriter")
 
     mean_dataframe = pd.DataFrame(
-        data=mean_score, columns=strategies, index=range(1, n_maps + 1)
+        data=mean_score, columns=strategies, index=maps
     )
     std_dataframe = pd.DataFrame(
-        data=std_score, columns=strategies, index=range(1, n_maps + 1)
+        data=std_score, columns=strategies, index=maps
     )
     min_dataframe = pd.DataFrame(
-        data=min_score, columns=strategies, index=range(1, n_maps + 1)
+        data=min_score, columns=strategies, index=maps
     )
     time_dataframe = pd.DataFrame(
-        data=average_time, columns=strategies, index=range(1, n_maps + 1)
+        data=average_time, columns=strategies, index=maps
     )
 
     mean_dataframe.to_excel(writer, sheet_name="Mean score")
