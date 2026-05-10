@@ -138,7 +138,8 @@ if __name__ == "__main__":
             average_time[counter, strategy_id] = np.nanmean(time_list)
             print(strategy, " runs done")
 
-    writer = pd.ExcelWriter("Aggregated_scores_discrete.xlsx", engine="xlsxwriter")
+    writer = pd.ExcelWriter("Aggregated_scores_continuous_baselines_5_10.xlsx", engine="xlsxwriter")
+    writer = pd.ExcelWriter("Aggregated_scores_continuous_baselines_13_15.xlsx", engine="xlsxwriter")
 
     mean_dataframe = pd.DataFrame(
         data=mean_score, columns=strategies, index=maps
